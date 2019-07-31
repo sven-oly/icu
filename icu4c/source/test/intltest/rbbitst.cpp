@@ -736,7 +736,7 @@ void RBBITest::TestExtended() {
     int32_t    tagValue = 0;             // The numeric value of a <nnn> tag.
 
     UnicodeString       rules;           // Holds rules from a <rules> ... </rules> block
-    int32_t             rulesFirstLine;  // Line number of the start of current <rules> block
+    int32_t             rulesFirstLine = 0;  // Line number of the start of current <rules> block
 
     for (charIdx = 0; charIdx < len; ) {
         status = U_ZERO_ERROR;
@@ -1630,6 +1630,9 @@ private:
     UnicodeSet  *fLVTSet;
     UnicodeSet  *fHangulSet;
     UnicodeSet  *fExtendedPictSet;
+    UnicodeSet  *fViramaSet;
+    UnicodeSet  *fLinkingConsonantSet;
+    UnicodeSet  *fExtCccZwjSet;
     UnicodeSet  *fAnySet;
 
     const UnicodeString *fText;
@@ -1662,6 +1665,11 @@ RBBICharMonkey::RBBICharMonkey() {
     fHangulSet->addAll(*fLVTSet);
 
     fExtendedPictSet  = new UnicodeSet(u"[:Extended_Pictographic:]", status);
+    fViramaSet        = new UnicodeSet(u"[\\p{Gujr}\\p{sc=Telu}\\p{sc=Mlym}\\p{sc=Orya}\\p{sc=Beng}\\p{sc=Deva}&"
+                                        "\\p{Indic_Syllabic_Category=Virama}]", status);
+    fLinkingConsonantSet = new UnicodeSet(u"[\\p{Gujr}\\p{sc=Telu}\\p{sc=Mlym}\\p{sc=Orya}\\p{sc=Beng}\\p{sc=Deva}&"
+                                        "\\p{Indic_Syllabic_Category=Consonant}]", status);
+    fExtCccZwjSet     = new UnicodeSet(u"[[\\p{gcb=Extend}-\\p{ccc=0}] \\p{gcb=ZWJ}]", status);
     fAnySet           = new UnicodeSet(0, 0x10ffff);
 
     // Create sets of characters, and dd the names of the above character sets.
@@ -1692,6 +1700,12 @@ RBBICharMonkey::RBBICharMonkey() {
     classNames[cindex] = "ZWJ"; cindex++;
     fSets->addElement(fExtendedPictSet, status);
     classNames[cindex] = "ExtendedPict"; cindex++;
+    fSets->addElement(fViramaSet,     status);
+    classNames[cindex] = "Virama"; cindex++;
+    fSets->addElement(fLinkingConsonantSet, status);
+    classNames[cindex] = "LinkingConsonant"; cindex++;
+    fSets->addElement(fExtCccZwjSet,   status);
+    classNames[cindex] = "ExtCcccZwj"; cindex++;
     if (U_FAILURE(status)) {
         deferredStatus = status;
     }
@@ -1812,6 +1826,22 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
             continue;
         }
 
+        // Rule (GB9.3)  LinkingConsonant ExtCccZwj* Virama ExtCccZwj* × LinkingConsonant
+        //   Note: Viramas are also included in the ExtCccZwj class.
+        if (fLinkingConsonantSet->contains(c2)) {
+            int pi = p1;
+            bool sawVirama = false;
+            while (pi > 0 && fExtCccZwjSet->contains(fText->char32At(pi))) {
+                if (fViramaSet->contains(fText->char32At(pi))) {
+                    sawVirama = true;
+                }
+                pi = fText->moveIndex32(pi, -1);
+            }
+            if (sawVirama && fLinkingConsonantSet->contains(fText->char32At(pi))) {
+                continue;
+            }
+        }
+
         // Rule (GB11)   Extended_Pictographic Extend * ZWJ x Extended_Pictographic
         if (fExtendedPictSet->contains(cBase) && fZWJSet->contains(c1) && fExtendedPictSet->contains(c2)) {
             continue;
@@ -1861,6 +1891,10 @@ RBBICharMonkey::~RBBICharMonkey() {
     delete fAnySet;
     delete fZWJSet;
     delete fExtendedPictSet;   
+    delete fViramaSet;
+    delete fLinkingConsonantSet;
+    delete fExtCccZwjSet;
+
     delete classNames;
 }
 
