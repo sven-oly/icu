@@ -1546,23 +1546,31 @@ public:
     // Return -1 after reaching end of string.
     virtual  int32_t   next(int32_t i) = 0;
 
+    // Name of each character class, parallel with charClasses. Used for debugging output
+    // of characters.
+    virtual  const char**     characterClassNames();
     virtual ~RBBIMonkeyKind();
     UErrorCode       deferredStatus;
 
 
 protected:
     RBBIMonkeyKind();
+    const char** classNames;
 
 private:
 };
 
 RBBIMonkeyKind::RBBIMonkeyKind() {
     deferredStatus = U_ZERO_ERROR;
+    delete classNames;
 }
 
 RBBIMonkeyKind::~RBBIMonkeyKind() {
 }
 
+const char** RBBIMonkeyKind::characterClassNames() {
+    return classNames;
+}
 
 //----------------------------------------------------------------------------------------
 //
@@ -1661,6 +1669,25 @@ RBBICharMonkey::RBBICharMonkey() {
     if (U_FAILURE(status)) {
         deferredStatus = status;
     }
+
+    // Add the names of the above character sets.
+    // In each new ICU release, add new names corresponding to the sets above.
+    classNames = new const char*[15];  // Use the size of fSets
+    classNames[0] = "CRLF";
+    classNames[1] = "Control";
+    classNames[2] = "Extend";
+    classNames[3] = "ZWJ";
+    classNames[4] = "Regional Indicator";
+    classNames[5] = "Prepend";
+    classNames[6] = "Spacing";
+    classNames[7] = "L";
+    classNames[8] = "V";
+    classNames[9] = "T";
+    classNames[10] = "LV";
+    classNames[11] = "LVT";
+    classNames[12] = "Hangul";
+    classNames[13] = "Extended Pictographic";
+    classNames[14] = "Any";
 }
 
 
@@ -1768,10 +1795,11 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
         }
 
         // Rule (GB9a)   x  SpacingMark
-        if (fSpacingSet->contains(c2)) {
+     /* TEMPORARY!!!
+       if (fSpacingSet->contains(c2)) {
             continue;
         }
-
+    */  
         // Rule (GB9b)   Prepend x
         if (fPrependSet->contains(c1)) {
             continue;
@@ -1809,7 +1837,6 @@ UVector  *RBBICharMonkey::charClasses() {
     return fSets;
 }
 
-
 RBBICharMonkey::~RBBICharMonkey() {
     delete fSets;
     delete fCRLFSet;
@@ -1826,7 +1853,8 @@ RBBICharMonkey::~RBBICharMonkey() {
     delete fHangulSet;
     delete fAnySet;
     delete fZWJSet;
-    delete fExtendedPictSet;
+    delete fExtendedPictSet;   
+    delete classNames;
 }
 
 //------------------------------------------------------------------------------------------
@@ -1868,6 +1896,8 @@ private:
     UnicodeSet  *fExtendedPictSet;
 
     const UnicodeString  *fText;
+
+    char** classNames;
 };
 
 
@@ -1961,6 +1991,8 @@ RBBIWordMonkey::RBBIWordMonkey()
     if (U_FAILURE(status)) {
         deferredStatus = status;
     }
+
+    classNames = new char*[18];
 }
 
 void RBBIWordMonkey::setText(const UnicodeString &s) {
@@ -2160,7 +2192,6 @@ UVector  *RBBIWordMonkey::charClasses() {
     return fSets;
 }
 
-
 RBBIWordMonkey::~RBBIWordMonkey() {
     delete fSets;
     delete fCRSet;
@@ -2184,6 +2215,7 @@ RBBIWordMonkey::~RBBIWordMonkey() {
     delete fOtherSet;
     delete fZWJSet;
     delete fExtendedPictSet;
+    delete classNames;
 }
 
 
@@ -2224,7 +2256,6 @@ private:
     UnicodeSet  *fExtendSet;
 
     const UnicodeString  *fText;
-
 };
 
 RBBISentMonkey::RBBISentMonkey()
@@ -2286,6 +2317,22 @@ RBBISentMonkey::RBBISentMonkey()
     if (U_FAILURE(status)) {
         deferredStatus = status;
     }
+
+    classNames = new const char*[13];
+    int i = 0;
+    classNames[i] = "fSepSet"; i++; 
+    classNames[i] = "fFormatSet"; i++;
+    classNames[i] = "fSpSet"; i++;
+    classNames[i] = "fLowerSet"; i++;
+    classNames[i] = "fUpperSet"; i++;
+    classNames[i] = "fOLetterSet"; i++;
+    classNames[i] = "fNumericSet"; i++;
+    classNames[i] = "fATermSet"; i++;
+    classNames[i] = "fSContinueSet"; i++;
+    classNames[i] = "fSTermSet"; i++;
+    classNames[i] = "fCloseSet"; i++;
+    classNames[i] = "fOtherSet"; i++;
+    classNames[i] = "fExtendSet"; i++;
 }
 
 
@@ -2297,7 +2344,6 @@ void RBBISentMonkey::setText(const UnicodeString &s) {
 UVector  *RBBISentMonkey::charClasses() {
     return fSets;
 }
-
 
 //  moveBack()   Find the "significant" code point preceding the index i.
 //               Skips over ($Extend | $Format)* .
@@ -2510,6 +2556,7 @@ RBBISentMonkey::~RBBISentMonkey() {
     delete fCloseSet;
     delete fOtherSet;
     delete fExtendSet;
+    delete classNames;
 }
 
 
@@ -2715,6 +2762,49 @@ RBBILineMonkey::RBBILineMonkey() :
     if (U_FAILURE(status)) {
         deferredStatus = status;
     }
+    classNames = new const char*[41];
+    int i = 0;
+    classNames[i] = "fBK"; i++;
+    classNames[i] = "fCR"; i++;
+    classNames[i] = "fLF"; i++;
+    classNames[i] = "fCM"; i++;
+    classNames[i] = "fNL"; i++;
+    classNames[i] = "fWJ"; i++;
+    classNames[i] = "fZW"; i++;
+    classNames[i] = "fGL"; i++;
+    classNames[i] = "fCB"; i++;
+    classNames[i] = "fSP"; i++;
+    classNames[i] = "fB2"; i++;
+    classNames[i] = "fBA"; i++;
+    classNames[i] = "fBB"; i++;
+    classNames[i] = "fHY"; i++;
+    classNames[i] = "fH2"; i++;
+    classNames[i] = "fH3"; i++;
+    classNames[i] = "fCL"; i++;
+    classNames[i] = "fCP"; i++;
+    classNames[i] = "fEX"; i++;
+    classNames[i] = "fIN"; i++;
+    classNames[i] = "fJL"; i++;
+    classNames[i] = "fJT"; i++;
+    classNames[i] = "fJV"; i++;
+    classNames[i] = "fNS"; i++;
+    classNames[i] = "fOP"; i++;
+    classNames[i] = "fQU"; i++;
+    classNames[i] = "fIS"; i++;
+    classNames[i] = "fNU"; i++;
+    classNames[i] = "fPO"; i++;
+    classNames[i] = "fPR"; i++;
+    classNames[i] = "fSY"; i++;
+    classNames[i] = "fAI"; i++;
+    classNames[i] = "fAL"; i++;
+    classNames[i] = "fHL"; i++;
+    classNames[i] = "fID"; i++;
+    classNames[i] = "fWJ"; i++;
+    classNames[i] = "fRI"; i++;
+    classNames[i] = "fSG"; i++;
+    classNames[i] = "fEB"; i++;
+    classNames[i] = "fEM"; i++;
+    classNames[i] = "fZWJ"; i++;
 }
 
 
@@ -3281,6 +3371,8 @@ RBBILineMonkey::~RBBILineMonkey() {
 
     delete fCharBI;
     delete fNumberMatcher;
+
+    delete classNames;
 }
 
 
@@ -3884,6 +3976,9 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
         }
     }
 
+    // Create an array of the charact class indices.
+    int* testTextClassIndex = new int[TESTSTRINGLEN];
+    
     while (loopCount < numIterations || numIterations == -1) {
         if (numIterations == -1 && loopCount % 10 == 0) {
             // If test is running in an infinite loop, display a periodic tic so
@@ -3900,7 +3995,7 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
             int32_t  aClassNum = m_rand() % numCharClasses;
             UnicodeSet *classSet = (UnicodeSet *)chClasses->elementAt(aClassNum);
             int32_t   charIdx = m_rand() % classSet->size();
-            UChar32   c = classSet->charAt(charIdx);
+            UChar32   c = classSet->charAt(charIdx);            
             if (c < 0) {   // TODO:  deal with sets containing strings.
                 errln("%s:%d c < 0", __FILE__, __LINE__);
                 break;
@@ -3912,6 +4007,7 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
             }
 
             testText.append(c);
+            testTextClassIndex[i] = aClassNum;
         }
 
         // Calculate the expected results for this test string.
@@ -4044,6 +4140,8 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
 
                 // Start of the range is the last point where expected and actual results
                 //   both agreed that there was a break position.
+                const char** charClassNames = mk.characterClassNames();
+
                 int startContext = i;
                 int32_t count = 0;
                 for (;;) {
@@ -4083,6 +4181,9 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                     UChar32  c;
                     int      bn;
                     c = testText.char32At(ci);
+                    
+                    // Then use that index in the set of charClassNames, if defined, to get
+                    // the class name info, then add to the error Text.
                     if (ci == i) {
                         // This is the location of the error.
                         errorText.append("<?>");
@@ -4102,6 +4203,16 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                         }
                     }
                     ci = testText.moveIndex32(ci, 1);
+                    
+                    // Add the class name to the error text.
+                    // the class name info, then add to the error Text.
+                    // Get the index of the character class of this character.
+                    int classIndex = testTextClassIndex[ci];
+                    if (charClassNames and charClassNames[classIndex]) {
+                        errorText.append(" (");
+                        errorText.append(charClassNames[classIndex]);
+                        errorText.append(") ");
+                    }
                 }
                 errorText.append("\\");
                 errorText.append("</data>\n");
