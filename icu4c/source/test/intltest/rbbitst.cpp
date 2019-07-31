@@ -1675,37 +1675,52 @@ RBBICharMonkey::RBBICharMonkey() {
     // Create sets of characters, and dd the names of the above character sets.
     // In each new ICU release, add new names corresponding to the sets above.
     fSets             = new UVector(status);
-    classNames = new const char*[fSets->size()];
+
+    // TODO: Use STL vector to avoid memory issues.
+    classNames = new const char*[100];  // TEMPORARY
     int cindex = 0;
 
     fSets->addElement(fCRLFSet,    status);
     classNames[cindex] = "CRLF"; cindex++;
+
     fSets->addElement(fControlSet, status);
     classNames[cindex] = "Control"; cindex++;
+
     fSets->addElement(fExtendSet,  status);
-    classNames[cindex] = "Extend"; cindex++;
+    classNames[cindex] = "Extended"; cindex++;
+
     fSets->addElement(fRegionalIndicatorSet, status);
     classNames[cindex] = "RegionalIndicator"; cindex++;
+
     if (!fPrependSet->isEmpty()) {
         fSets->addElement(fPrependSet, status);
         classNames[cindex] = "Prepend"; cindex++;
     }
+
     fSets->addElement(fSpacingSet, status);
     classNames[cindex] = "Spacing"; cindex++;
+
     fSets->addElement(fHangulSet,  status);
     classNames[cindex] = "Hangul"; cindex++;
+
     fSets->addElement(fAnySet,     status);
     classNames[cindex] = "Any"; cindex++;
+
     fSets->addElement(fZWJSet,     status);
     classNames[cindex] = "ZWJ"; cindex++;
+
     fSets->addElement(fExtendedPictSet, status);
     classNames[cindex] = "ExtendedPict"; cindex++;
+
     fSets->addElement(fViramaSet,     status);
     classNames[cindex] = "Virama"; cindex++;
+
     fSets->addElement(fLinkingConsonantSet, status);
     classNames[cindex] = "LinkingConsonant"; cindex++;
+
     fSets->addElement(fExtCccZwjSet,   status);
     classNames[cindex] = "ExtCcccZwj"; cindex++;
+
     if (U_FAILURE(status)) {
         deferredStatus = status;
     }
@@ -4211,7 +4226,7 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                 }
 
                 // Format looks like   "<data>\\\uabcd\uabcd\\\U0001abcd...</data>"
-                UnicodeString errorText = "";
+                UnicodeString errorText = "  ";
                 /***if (strcmp(errorType, "next()") == 0) {
                     startContext = 0;
                     endContext = testText.length();
@@ -4225,15 +4240,16 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                     int      bn;
                     c = testText.char32At(ci);
                     
-                    // Then use that index in the set of charClassNames, if defined, to get
-                    // the class name info, then add to the error Text.
+                    char buffer[200];
                     if (ci == i) {
-                        // This is the location of the error.
-                        errorText.append("<?>");
-                    } else if (expectedBreaks[ci] != 0) {
-                        // This a non-error expected break position.
-                        errorText.append("\\");
+                        // Where the error is
+                        sprintf(buffer, "--> %3i : ", ci);  // The position
+                    } else {
+                        sprintf(buffer, "    %3i : ", ci);  // The position
                     }
+                    errorText.append(buffer);
+
+                    // TODO: use sprintf to get the columns aligned.
                     if (c < 0x10000) {
                         errorText.append("\\u");
                         for (bn=12; bn>=0; bn-=4) {
@@ -4245,13 +4261,15 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                             errorText.append(hexChars.charAt((c>>bn)&0xf));
                         }
                     }
-                    ci = testText.moveIndex32(ci, 1);
+                    // TODO: add symbols for expected and actual break data.
+                    if (expectedBreaks[ci] != 0) {
+                        // This a non-error expected break position.
+                        errorText.append(" *|* ");
+                    }
                     
-                    // Get character description
-                    errorText.append(" indx = ");
-                    errorText.append(ci);
-                    errorText.append(" : ");
+                    ci = testText.moveIndex32(ci, 1);
 
+                    // Get character description
                     char cName[200];
                     UErrorCode status = U_ZERO_ERROR;
 
