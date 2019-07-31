@@ -1551,7 +1551,7 @@ public:
     virtual  const char**     characterClassNames();
     virtual ~RBBIMonkeyKind();
     UErrorCode       deferredStatus;
-
+    int classIndexFromTestTextClassIndex(const UChar32 c);
 
 protected:
     RBBIMonkeyKind();
@@ -1562,14 +1562,25 @@ private:
 
 RBBIMonkeyKind::RBBIMonkeyKind() {
     deferredStatus = U_ZERO_ERROR;
-    delete classNames;
 }
 
 RBBIMonkeyKind::~RBBIMonkeyKind() {
+    delete classNames;
 }
 
 const char** RBBIMonkeyKind::characterClassNames() {
     return classNames;
+}
+
+int RBBIMonkeyKind::classIndexFromTestTextClassIndex(const UChar32 c) {
+    // Simply iterate through charClasses to find character's class
+    for (int aClassNum = 0; aClassNum < charClasses()->size(); aClassNum++) {
+        UnicodeSet *classSet = (UnicodeSet *)charClasses()->elementAt(aClassNum);
+        if (classSet->contains(c)) {
+            return aClassNum;
+        }
+    }
+    return -1; // This should not happen.
 }
 
 //----------------------------------------------------------------------------------------
@@ -1661,44 +1672,43 @@ RBBICharMonkey::RBBICharMonkey() {
     fExtCccZwjSet     = new UnicodeSet(u"[[\\p{gcb=Extend}-\\p{ccc=0}] \\p{gcb=ZWJ}]", status);
     fAnySet           = new UnicodeSet(0, 0x10ffff);
 
+    // Create sets of characters, and dd the names of the above character sets.
+    // In each new ICU release, add new names corresponding to the sets above.
     fSets             = new UVector(status);
+    classNames = new const char*[fSets->size()];
+    int cindex = 0;
+
     fSets->addElement(fCRLFSet,    status);
+    classNames[cindex] = "CRLF"; cindex++;
     fSets->addElement(fControlSet, status);
+    classNames[cindex] = "Control"; cindex++;
     fSets->addElement(fExtendSet,  status);
+    classNames[cindex] = "Extend"; cindex++;
     fSets->addElement(fRegionalIndicatorSet, status);
+    classNames[cindex] = "RegionalIndicator"; cindex++;
     if (!fPrependSet->isEmpty()) {
         fSets->addElement(fPrependSet, status);
+        classNames[cindex] = "Prepend"; cindex++;
     }
     fSets->addElement(fSpacingSet, status);
+    classNames[cindex] = "Spacing"; cindex++;
     fSets->addElement(fHangulSet,  status);
+    classNames[cindex] = "Hangul"; cindex++;
     fSets->addElement(fAnySet,     status);
+    classNames[cindex] = "Any"; cindex++;
     fSets->addElement(fZWJSet,     status);
+    classNames[cindex] = "ZWJ"; cindex++;
     fSets->addElement(fExtendedPictSet, status);
+    classNames[cindex] = "ExtendedPict"; cindex++;
     fSets->addElement(fViramaSet,     status);
+    classNames[cindex] = "Virama"; cindex++;
     fSets->addElement(fLinkingConsonantSet, status);
+    classNames[cindex] = "LinkingConsonant"; cindex++;
     fSets->addElement(fExtCccZwjSet,   status);
+    classNames[cindex] = "ExtCcccZwj"; cindex++;
     if (U_FAILURE(status)) {
         deferredStatus = status;
     }
-
-    // Add the names of the above character sets.
-    // In each new ICU release, add new names corresponding to the sets above.
-    classNames = new const char*[15];  // Use the size of fSets
-    classNames[0] = "CRLF";
-    classNames[1] = "Control";
-    classNames[2] = "Extend";
-    classNames[3] = "ZWJ";
-    classNames[4] = "Regional Indicator";
-    classNames[5] = "Prepend";
-    classNames[6] = "Spacing";
-    classNames[7] = "L";
-    classNames[8] = "V";
-    classNames[9] = "T";
-    classNames[10] = "LV";
-    classNames[11] = "LVT";
-    classNames[12] = "Hangul";
-    classNames[13] = "Extended Pictographic";
-    classNames[14] = "Any";
 }
 
 
@@ -1880,10 +1890,13 @@ RBBICharMonkey::~RBBICharMonkey() {
     delete fHangulSet;
     delete fAnySet;
     delete fZWJSet;
-    delete fExtendedPictSet;
+    delete fExtendedPictSet;   
     delete fViramaSet;
     delete fLinkingConsonantSet;
-    delete fExtCccZwjSet;}
+    delete fExtCccZwjSet;
+
+    delete classNames;
+}
 
 //------------------------------------------------------------------------------------------
 //
@@ -2450,6 +2463,8 @@ int32_t RBBISentMonkey::next(int32_t prevPos) {
 
         // Rule (3)  CR x LF
         if (c1==0x0d && c2==0x0a && p2==(p1+1)) {
+            // TODO: set a string that this rule was used
+            // Such as ???? = "Rule 3"
             continue;
         }
 
@@ -4004,8 +4019,8 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
         }
     }
 
-    // Create an array of the charact class indices.
-    int* testTextClassIndex = new int[TESTSTRINGLEN];
+    // Create an array of the character class indices.
+    int testTextClassIndex[TESTSTRINGLEN*2 + 1];
     
     while (loopCount < numIterations || numIterations == -1) {
         if (numIterations == -1 && loopCount % 10 == 0) {
@@ -4035,7 +4050,7 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
             }
 
             testText.append(c);
-            testTextClassIndex[i] = aClassNum;
+            testTextClassIndex[i] = aClassNum;  // TODO: make sure this is the right index for the code point.
         }
 
         // Calculate the expected results for this test string.
@@ -4196,7 +4211,7 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                 }
 
                 // Format looks like   "<data>\\\uabcd\uabcd\\\U0001abcd...</data>"
-                UnicodeString errorText = "<data>";
+                UnicodeString errorText = "";
                 /***if (strcmp(errorType, "next()") == 0) {
                     startContext = 0;
                     endContext = testText.length();
@@ -4232,18 +4247,28 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                     }
                     ci = testText.moveIndex32(ci, 1);
                     
+                    // Get character description
+                    errorText.append(" indx = ");
+                    errorText.append(ci);
+                    errorText.append(" : ");
+
+                    char cName[200];
+                    UErrorCode status = U_ZERO_ERROR;
+
+                    u_charName(c, U_EXTENDED_CHAR_NAME, cName, sizeof(cName), &status);
                     // Add the class name to the error text.
                     // the class name info, then add to the error Text.
                     // Get the index of the character class of this character.
-                    int classIndex = testTextClassIndex[ci];
-                    if (charClassNames and charClassNames[classIndex]) {
+                    const int classIndex = mk.classIndexFromTestTextClassIndex(c);
+                    if (classIndex >=0 && charClassNames and charClassNames[classIndex]) {
                         errorText.append(" (");
                         errorText.append(charClassNames[classIndex]);
                         errorText.append(") ");
                     }
+                        errorText.append(cName);
+                        errorText.append("\n  ");
                 }
-                errorText.append("\\");
-                errorText.append("</data>\n");
+                errorText.append("\n");
 
                 // Output the error
                 char  charErrorTxt[500];
