@@ -1548,14 +1548,14 @@ public:
 
     // Name of each character class, parallel with charClasses. Used for debugging output
     // of characters.
-    virtual  const char**     characterClassNames();
+    virtual  std::vector<std::string>     characterClassNames();
     virtual ~RBBIMonkeyKind();
     UErrorCode       deferredStatus;
     int classIndexFromTestTextClassIndex(const UChar32 c);
 
 protected:
     RBBIMonkeyKind();
-    const char** classNames;
+    std::vector<std::string> classNames;
 
 private:
 };
@@ -1565,10 +1565,9 @@ RBBIMonkeyKind::RBBIMonkeyKind() {
 }
 
 RBBIMonkeyKind::~RBBIMonkeyKind() {
-    delete classNames;
 }
 
-const char** RBBIMonkeyKind::characterClassNames() {
+std::vector<std::string> RBBIMonkeyKind::characterClassNames() {
     return classNames;
 }
 
@@ -1676,50 +1675,22 @@ RBBICharMonkey::RBBICharMonkey() {
     // In each new ICU release, add new names corresponding to the sets above.
     fSets             = new UVector(status);
 
-    // TODO: Use STL vector to avoid memory issues.
-    classNames = new const char*[100];  // TEMPORARY
-    int cindex = 0;
-
-    fSets->addElement(fCRLFSet,    status);
-    classNames[cindex] = "CRLF"; cindex++;
-
-    fSets->addElement(fControlSet, status);
-    classNames[cindex] = "Control"; cindex++;
-
-    fSets->addElement(fExtendSet,  status);
-    classNames[cindex] = "Extended"; cindex++;
-
-    fSets->addElement(fRegionalIndicatorSet, status);
-    classNames[cindex] = "RegionalIndicator"; cindex++;
-
+    // TODO: Consider structure to create and store sets with same names
+    fSets->addElement(fCRLFSet, status); classNames.push_back("CRLF");
+    fSets->addElement(fControlSet, status); classNames.push_back("Control");
+    fSets->addElement(fExtendSet, status); classNames.push_back("Extended");
+    fSets->addElement(fRegionalIndicatorSet, status); classNames.push_back("RegionalIndicator");
     if (!fPrependSet->isEmpty()) {
-        fSets->addElement(fPrependSet, status);
-        classNames[cindex] = "Prepend"; cindex++;
+        fSets->addElement(fPrependSet, status); classNames.push_back("Prepend");
     }
-
-    fSets->addElement(fSpacingSet, status);
-    classNames[cindex] = "Spacing"; cindex++;
-
-    fSets->addElement(fHangulSet,  status);
-    classNames[cindex] = "Hangul"; cindex++;
-
-    fSets->addElement(fAnySet,     status);
-    classNames[cindex] = "Any"; cindex++;
-
-    fSets->addElement(fZWJSet,     status);
-    classNames[cindex] = "ZWJ"; cindex++;
-
-    fSets->addElement(fExtendedPictSet, status);
-    classNames[cindex] = "ExtendedPict"; cindex++;
-
-    fSets->addElement(fViramaSet,     status);
-    classNames[cindex] = "Virama"; cindex++;
-
-    fSets->addElement(fLinkingConsonantSet, status);
-    classNames[cindex] = "LinkingConsonant"; cindex++;
-
-    fSets->addElement(fExtCccZwjSet,   status);
-    classNames[cindex] = "ExtCcccZwj"; cindex++;
+    fSets->addElement(fSpacingSet, status); classNames.push_back("Spacing");
+    fSets->addElement(fHangulSet, status); classNames.push_back("Hangul");
+    fSets->addElement(fAnySet, status); classNames.push_back("Any");
+    fSets->addElement(fZWJSet, status); classNames.push_back("ZWJ");
+    fSets->addElement(fExtendedPictSet, status); classNames.push_back("ExtendedPict");
+    fSets->addElement(fViramaSet, status); classNames.push_back("Virama");
+    fSets->addElement(fLinkingConsonantSet, status); classNames.push_back("LinkingConsonant");
+    fSets->addElement(fExtCccZwjSet, status); classNames.push_back("ExtCcccZwj");
 
     if (U_FAILURE(status)) {
         deferredStatus = status;
@@ -1794,12 +1765,13 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
 
         // Rule (GB5)    <break>  ( Control | CR | LF )
         //
-        if (fControlSet->contains(c2) ||
+      /* TODO: REPLACE CODE WHEN TESTING COMPLETED!!!
+         if (fControlSet->contains(c2) ||
             c2 == 0x0D ||
             c2 == 0x0A)  {
             break;
         }
-
+      */
 
         // Rule (GB6)  L x ( L | V | LV | LVT )
         if (fLSet->contains(c1) &&
@@ -1909,8 +1881,6 @@ RBBICharMonkey::~RBBICharMonkey() {
     delete fViramaSet;
     delete fLinkingConsonantSet;
     delete fExtCccZwjSet;
-
-    delete classNames;
 }
 
 //------------------------------------------------------------------------------------------
@@ -1952,8 +1922,6 @@ private:
     UnicodeSet  *fExtendedPictSet;
 
     const UnicodeString  *fText;
-
-    char** classNames;
 };
 
 
@@ -2020,35 +1988,36 @@ RBBIWordMonkey::RBBIWordMonkey()
     // Inhibit dictionary characters from being tested at all.
     fOtherSet->removeAll(*fDictionarySet);
 
-    fSets->addElement(fCRSet,                status);
-    fSets->addElement(fLFSet,                status);
-    fSets->addElement(fNewlineSet,           status);
-    fSets->addElement(fRegionalIndicatorSet, status);
-    fSets->addElement(fHebrew_LetterSet,     status);
-    fSets->addElement(fALetterSet,           status);
-    fSets->addElement(fSingle_QuoteSet,      status);
-    fSets->addElement(fDouble_QuoteSet,      status);
-    //fSets->addElement(fKatakanaSet,          status); // Omit Katakana from fSets, which omits Katakana characters
-                                                        // from the test data. They are all in the dictionary set,
-                                                        // which this (old, to be retired) monkey test cannot handle.
-    fSets->addElement(fMidLetterSet,         status);
-    fSets->addElement(fMidNumLetSet,         status);
-    fSets->addElement(fMidNumSet,            status);
-    fSets->addElement(fNumericSet,           status);
-    fSets->addElement(fFormatSet,            status);
-    fSets->addElement(fExtendSet,            status);
-    fSets->addElement(fOtherSet,             status);
-    fSets->addElement(fExtendNumLetSet,      status);
-    fSets->addElement(fWSegSpaceSet,         status);
+    // Add classes and their names
+    fSets->addElement(fCRSet, status); classNames.push_back("CR");
+    fSets->addElement(fLFSet, status); classNames.push_back("LF");
+    fSets->addElement(fNewlineSet, status); classNames.push_back("Newline");
+    fSets->addElement(fRegionalIndicatorSet, status); classNames.push_back("RegionalIndicator");
+    fSets->addElement(fHebrew_LetterSet, status); classNames.push_back("Heb");
+    fSets->addElement(fALetterSet, status); classNames.push_back("ALetter");
+    fSets->addElement(fSingle_QuoteSet, status); classNames.push_back("Sin");
+    fSets->addElement(fDouble_QuoteSet, status); classNames.push_back("Dou");
+    // Omit Katakana from fSets, which omits Katakana characters
+    // from the test data. They are all in the dictionary set,
+    // which this (old, to be retired) monkey test cannot handle.
+    //fSets->addElement(fKatakanaSet, status);
 
-    fSets->addElement(fZWJSet,               status);
-    fSets->addElement(fExtendedPictSet,      status);
+    fSets->addElement(fMidLetterSet, status); classNames.push_back("MidLetter");
+    fSets->addElement(fMidNumLetSet, status); classNames.push_back("MidNumLet");
+    fSets->addElement(fMidNumSet, status); classNames.push_back("MidNum");
+    fSets->addElement(fNumericSet, status); classNames.push_back("Numeric");
+    fSets->addElement(fFormatSet, status); classNames.push_back("Format");
+    fSets->addElement(fExtendSet, status); classNames.push_back("Extend");
+    fSets->addElement(fOtherSet, status); classNames.push_back("Other");
+    fSets->addElement(fExtendNumLetSet, status); classNames.push_back("ExtendNumLet");
+    fSets->addElement(fWSegSpaceSet, status); classNames.push_back("WSegSpace");
+
+    fSets->addElement(fZWJSet, status); classNames.push_back("ZWJ");
+    fSets->addElement(fExtendedPictSet, status); classNames.push_back("ExtendedPict");
 
     if (U_FAILURE(status)) {
         deferredStatus = status;
     }
-
-    classNames = new char*[18];
 }
 
 void RBBIWordMonkey::setText(const UnicodeString &s) {
@@ -2271,7 +2240,6 @@ RBBIWordMonkey::~RBBIWordMonkey() {
     delete fOtherSet;
     delete fZWJSet;
     delete fExtendedPictSet;
-    delete classNames;
 }
 
 
@@ -2356,39 +2324,23 @@ RBBISentMonkey::RBBISentMonkey()
     fOtherSet->removeAll(*fCloseSet);
     fOtherSet->removeAll(*fExtendSet);
 
-    fSets->addElement(fSepSet,       status);
-    fSets->addElement(fFormatSet,    status);
-    fSets->addElement(fSpSet,        status);
-    fSets->addElement(fLowerSet,     status);
-    fSets->addElement(fUpperSet,     status);
-    fSets->addElement(fOLetterSet,   status);
-    fSets->addElement(fNumericSet,   status);
-    fSets->addElement(fATermSet,     status);
-    fSets->addElement(fSContinueSet, status);
-    fSets->addElement(fSTermSet,     status);
-    fSets->addElement(fCloseSet,     status);
-    fSets->addElement(fOtherSet,     status);
-    fSets->addElement(fExtendSet,    status);
+    fSets->addElement(fSepSet, status); classNames.push_back("Sep");
+    fSets->addElement(fFormatSet, status); classNames.push_back("Format");
+    fSets->addElement(fSpSet, status); classNames.push_back("Sp");
+    fSets->addElement(fLowerSet, status); classNames.push_back("Lower");
+    fSets->addElement(fUpperSet, status); classNames.push_back("Upper");
+    fSets->addElement(fOLetterSet, status); classNames.push_back("OLetter");
+    fSets->addElement(fNumericSet, status); classNames.push_back("Numeric");
+    fSets->addElement(fATermSet, status); classNames.push_back("ATerm");
+    fSets->addElement(fSContinueSet, status); classNames.push_back("SContinue");
+    fSets->addElement(fSTermSet, status); classNames.push_back("STerm");
+    fSets->addElement(fCloseSet, status); classNames.push_back("Close");
+    fSets->addElement(fOtherSet, status); classNames.push_back("Other");
+    fSets->addElement(fExtendSet, status); classNames.push_back("Extend");
 
     if (U_FAILURE(status)) {
         deferredStatus = status;
     }
-
-    classNames = new const char*[13];
-    int i = 0;
-    classNames[i] = "fSepSet"; i++; 
-    classNames[i] = "fFormatSet"; i++;
-    classNames[i] = "fSpSet"; i++;
-    classNames[i] = "fLowerSet"; i++;
-    classNames[i] = "fUpperSet"; i++;
-    classNames[i] = "fOLetterSet"; i++;
-    classNames[i] = "fNumericSet"; i++;
-    classNames[i] = "fATermSet"; i++;
-    classNames[i] = "fSContinueSet"; i++;
-    classNames[i] = "fSTermSet"; i++;
-    classNames[i] = "fCloseSet"; i++;
-    classNames[i] = "fOtherSet"; i++;
-    classNames[i] = "fExtendSet"; i++;
 }
 
 
@@ -2614,7 +2566,7 @@ RBBISentMonkey::~RBBISentMonkey() {
     delete fCloseSet;
     delete fOtherSet;
     delete fExtendSet;
-    delete classNames;
+    classNames.clear();
 }
 
 
@@ -2760,48 +2712,48 @@ RBBILineMonkey::RBBILineMonkey() :
 
     fHH->add(u'\u2010');   // Hyphen, '‐'
 
-    fSets->addElement(fBK, status);
-    fSets->addElement(fCR, status);
-    fSets->addElement(fLF, status);
-    fSets->addElement(fCM, status);
-    fSets->addElement(fNL, status);
-    fSets->addElement(fWJ, status);
-    fSets->addElement(fZW, status);
-    fSets->addElement(fGL, status);
-    fSets->addElement(fCB, status);
-    fSets->addElement(fSP, status);
-    fSets->addElement(fB2, status);
-    fSets->addElement(fBA, status);
-    fSets->addElement(fBB, status);
-    fSets->addElement(fHY, status);
-    fSets->addElement(fH2, status);
-    fSets->addElement(fH3, status);
-    fSets->addElement(fCL, status);
-    fSets->addElement(fCP, status);
-    fSets->addElement(fEX, status);
-    fSets->addElement(fIN, status);
-    fSets->addElement(fJL, status);
-    fSets->addElement(fJT, status);
-    fSets->addElement(fJV, status);
-    fSets->addElement(fNS, status);
-    fSets->addElement(fOP, status);
-    fSets->addElement(fQU, status);
-    fSets->addElement(fIS, status);
-    fSets->addElement(fNU, status);
-    fSets->addElement(fPO, status);
-    fSets->addElement(fPR, status);
-    fSets->addElement(fSY, status);
-    fSets->addElement(fAI, status);
-    fSets->addElement(fAL, status);
-    fSets->addElement(fHL, status);
-    fSets->addElement(fID, status);
-    fSets->addElement(fWJ, status);
-    fSets->addElement(fRI, status);
-    fSets->addElement(fSG, status);
-    fSets->addElement(fEB, status);
-    fSets->addElement(fEM, status);
-    fSets->addElement(fZWJ, status);
-
+    // Sets and names.
+    fSets->addElement(fBK, status); classNames.push_back("fBK");
+    fSets->addElement(fCR, status); classNames.push_back("fCR");
+    fSets->addElement(fLF, status); classNames.push_back("fLF");
+    fSets->addElement(fCM, status); classNames.push_back("fCM");
+    fSets->addElement(fNL, status); classNames.push_back("fNL");
+    fSets->addElement(fWJ, status); classNames.push_back("fWJ");
+    fSets->addElement(fZW, status); classNames.push_back("fZW");
+    fSets->addElement(fGL, status); classNames.push_back("fGL");
+    fSets->addElement(fCB, status); classNames.push_back("fCB");
+    fSets->addElement(fSP, status); classNames.push_back("fSP");
+    fSets->addElement(fB2, status); classNames.push_back("fB2");
+    fSets->addElement(fBA, status); classNames.push_back("fBA");
+    fSets->addElement(fBB, status); classNames.push_back("fBB");
+    fSets->addElement(fHY, status); classNames.push_back("fHY");
+    fSets->addElement(fH2, status); classNames.push_back("fH2");
+    fSets->addElement(fH3, status); classNames.push_back("fH3");
+    fSets->addElement(fCL, status); classNames.push_back("fCL");
+    fSets->addElement(fCP, status); classNames.push_back("fCP");
+    fSets->addElement(fEX, status); classNames.push_back("fEX");
+    fSets->addElement(fIN, status); classNames.push_back("fIN");
+    fSets->addElement(fJL, status); classNames.push_back("fJL");
+    fSets->addElement(fJT, status); classNames.push_back("fJT");
+    fSets->addElement(fJV, status); classNames.push_back("fJV");
+    fSets->addElement(fNS, status); classNames.push_back("fNS");
+    fSets->addElement(fOP, status); classNames.push_back("fOP");
+    fSets->addElement(fQU, status); classNames.push_back("fQU");
+    fSets->addElement(fIS, status); classNames.push_back("fIS");
+    fSets->addElement(fNU, status); classNames.push_back("fNU");
+    fSets->addElement(fPO, status); classNames.push_back("fPO");
+    fSets->addElement(fPR, status); classNames.push_back("fPR");
+    fSets->addElement(fSY, status); classNames.push_back("fSY");
+    fSets->addElement(fAI, status); classNames.push_back("fAI");
+    fSets->addElement(fAL, status); classNames.push_back("fAL");
+    fSets->addElement(fHL, status); classNames.push_back("fHL");
+    fSets->addElement(fID, status); classNames.push_back("fID");
+    fSets->addElement(fWJ, status); classNames.push_back("fWJ");
+    fSets->addElement(fRI, status); classNames.push_back("fRI");
+    fSets->addElement(fSG, status); classNames.push_back("fSG");
+    fSets->addElement(fEB, status); classNames.push_back("fEB");
+    fSets->addElement(fEM, status); classNames.push_back("fEM");
+    fSets->addElement(fZWJ, status); classNames.push_back("fZWJ");
 
     const char *rules =
             "((\\p{Line_Break=PR}|\\p{Line_Break=PO})(\\p{Line_Break=CM}|\\u200d)*)?"
@@ -2820,49 +2772,7 @@ RBBILineMonkey::RBBILineMonkey() :
     if (U_FAILURE(status)) {
         deferredStatus = status;
     }
-    classNames = new const char*[41];
-    int i = 0;
-    classNames[i] = "fBK"; i++;
-    classNames[i] = "fCR"; i++;
-    classNames[i] = "fLF"; i++;
-    classNames[i] = "fCM"; i++;
-    classNames[i] = "fNL"; i++;
-    classNames[i] = "fWJ"; i++;
-    classNames[i] = "fZW"; i++;
-    classNames[i] = "fGL"; i++;
-    classNames[i] = "fCB"; i++;
-    classNames[i] = "fSP"; i++;
-    classNames[i] = "fB2"; i++;
-    classNames[i] = "fBA"; i++;
-    classNames[i] = "fBB"; i++;
-    classNames[i] = "fHY"; i++;
-    classNames[i] = "fH2"; i++;
-    classNames[i] = "fH3"; i++;
-    classNames[i] = "fCL"; i++;
-    classNames[i] = "fCP"; i++;
-    classNames[i] = "fEX"; i++;
-    classNames[i] = "fIN"; i++;
-    classNames[i] = "fJL"; i++;
-    classNames[i] = "fJT"; i++;
-    classNames[i] = "fJV"; i++;
-    classNames[i] = "fNS"; i++;
-    classNames[i] = "fOP"; i++;
-    classNames[i] = "fQU"; i++;
-    classNames[i] = "fIS"; i++;
-    classNames[i] = "fNU"; i++;
-    classNames[i] = "fPO"; i++;
-    classNames[i] = "fPR"; i++;
-    classNames[i] = "fSY"; i++;
-    classNames[i] = "fAI"; i++;
-    classNames[i] = "fAL"; i++;
-    classNames[i] = "fHL"; i++;
-    classNames[i] = "fID"; i++;
-    classNames[i] = "fWJ"; i++;
-    classNames[i] = "fRI"; i++;
-    classNames[i] = "fSG"; i++;
-    classNames[i] = "fEB"; i++;
-    classNames[i] = "fEM"; i++;
-    classNames[i] = "fZWJ"; i++;
+   
 }
 
 
@@ -3429,8 +3339,6 @@ RBBILineMonkey::~RBBILineMonkey() {
 
     delete fCharBI;
     delete fNumberMatcher;
-
-    delete classNames;
 }
 
 
@@ -4179,16 +4087,22 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
         // Compare the expected and actual results.
         for (i=0; i<=testText.length(); i++) {
             const char *errorType = NULL;
+            const char* currentBreakData = NULL;
             if  (forwardBreaks[i] != expectedBreaks[i]) {
                 errorType = "next()";
+                currentBreakData = forwardBreaks;
             } else if (reverseBreaks[i] != forwardBreaks[i]) {
                 errorType = "previous()";
-            } else if (isBoundaryBreaks[i] != expectedBreaks[i]) {
+                currentBreakData = reverseBreaks;
+           } else if (isBoundaryBreaks[i] != expectedBreaks[i]) {
                 errorType = "isBoundary()";
+                currentBreakData = isBoundaryBreaks;
             } else if (followingBreaks[i] != expectedBreaks[i]) {
                 errorType = "following()";
+                currentBreakData = followingBreaks;
             } else if (precedingBreaks[i] != expectedBreaks[i]) {
                 errorType = "preceding()";
+                currentBreakData = precedingBreaks;
             }
 
 
@@ -4198,7 +4112,7 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
 
                 // Start of the range is the last point where expected and actual results
                 //   both agreed that there was a break position.
-                const char** charClassNames = mk.characterClassNames();
+                std::vector<std::string> charClassNames = mk.characterClassNames();
 
                 int startContext = i;
                 int32_t count = 0;
@@ -4255,18 +4169,27 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                         for (bn=12; bn>=0; bn-=4) {
                             errorText.append(hexChars.charAt((c>>bn)&0xf));
                         }
+                        errorText.append("    ");
                     } else {
                         errorText.append("\\U");
                         for (bn=28; bn>=0; bn-=4) {
                             errorText.append(hexChars.charAt((c>>bn)&0xf));
                         }
                     }
-                    // TODO: add symbols for expected and actual break data.
+                    // Reference data.
                     if (expectedBreaks[ci] != 0) {
                         // This a non-error expected break position.
-                        errorText.append(" *|* ");
+                        errorText.append(" | ");
+                    } else {
+                        errorText.append(" . ");                      
                     }
-                    
+                    if (currentBreakData[ci] != 0) {
+                        // This a non-error expected break position.
+                        errorText.append(" | ");
+                    } else {
+                        errorText.append(" . ");                      
+                    }
+
                     ci = testText.moveIndex32(ci, 1);
 
                     // Get character description
@@ -4277,14 +4200,14 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                     // Add the class name to the error text.
                     // the class name info, then add to the error Text.
                     // Get the index of the character class of this character.
-                    const int classIndex = mk.classIndexFromTestTextClassIndex(c);
-                    if (classIndex >=0 && charClassNames and charClassNames[classIndex]) {
+                    const unsigned long classIndex = mk.classIndexFromTestTextClassIndex(c);
+                    if (classIndex >=0 && charClassNames.size() > classIndex) {
                         errorText.append(" (");
-                        errorText.append(charClassNames[classIndex]);
-                        errorText.append(") ");
+                        errorText.append(charClassNames[classIndex].c_str());
+                        errorText.append(")  ");
                     }
-                        errorText.append(cName);
-                        errorText.append("\n  ");
+                    errorText.append(cName);
+                    errorText.append("\n  ");
                 }
                 errorText.append("\n");
 
