@@ -1671,7 +1671,7 @@ RBBICharMonkey::RBBICharMonkey() {
     fExtCccZwjSet     = new UnicodeSet(u"[[\\p{gcb=Extend}-\\p{ccc=0}] \\p{gcb=ZWJ}]", status);
     fAnySet           = new UnicodeSet(0, 0x10ffff);
 
-    // Create sets of characters, and dd the names of the above character sets.
+    // Create sets of characters, and add the names of the above character sets.
     // In each new ICU release, add new names corresponding to the sets above.
     fSets             = new UVector(status);
 
@@ -2803,8 +2803,8 @@ void RBBILineMonkey::rule9Adjust(int32_t pos, UChar32 *posChar, int32_t *nextPos
     int32_t  nPos = *nextPos;
 
     // LB 9  Keep combining sequences together.
-    //  advance over any CM class chars.  Note that Line Break CM is different
-    //  from the normal Grapheme Extend property.
+    // advance over any CM class chars.  Note that Line Break CM is different
+    // from the normal Grapheme Extend property.
     if (!(fSP->contains(*posChar) || fBK->contains(*posChar) || *posChar==0x0d ||
           *posChar==0x0a ||fNL->contains(*posChar) || fZW->contains(*posChar))) {
         for (;;) {
@@ -4111,8 +4111,8 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                 //  a data item that can be included in the rbbi test data file.
 
                 // Start of the range is the last point where expected and actual results
-                //   both agreed that there was a break position.
-                std::vector<std::string> charClassNames = mk.characterClassNames();
+                //  both agreed that there was a break position.
+                std::vector<std::string>& charClassNames = mk.characterClassNames();
 
                 int startContext = i;
                 int32_t count = 0;
@@ -4145,8 +4145,8 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                 //   actual break:    '|' -> a break, '.' -> no break
                 //   (name of character clase)
                 //   Unicode name of character
-                // '-->' indicates location of the difference.
-                UnicodeString errorText = "  ";
+                //   '-->' indicates location of the difference.
+                UnicodeString errorText = "";
 
                 for (ci=startContext; ci<=endContext;) {
                     UnicodeString hexChars("0123456789abcdef");
@@ -4171,7 +4171,7 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                     } else {
                         errorText.append("\\U");
                     }
-                    for (bn=bn_top; bn>=0; bn-=4) {
+                    for (bn=bn_top; bn>=0; bn-=4) { // TODO(sven-oly): add comments here
                             errorText.append(hexChars.charAt((c>>bn)&0xf));
                     }
 
