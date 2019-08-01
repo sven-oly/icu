@@ -1675,7 +1675,8 @@ RBBICharMonkey::RBBICharMonkey() {
     // In each new ICU release, add new names corresponding to the sets above.
     fSets             = new UVector(status);
 
-    // TODO: Consider structure to create and store sets with same names
+    // Important: Keep class names the same as the class contents.
+    // TODO: Consider structure to create and store sets with same names.
     fSets->addElement(fCRLFSet, status); classNames.push_back("CRLF");
     fSets->addElement(fControlSet, status); classNames.push_back("Control");
     fSets->addElement(fExtendSet, status); classNames.push_back("Extended");
@@ -1765,7 +1766,7 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
 
         // Rule (GB5)    <break>  ( Control | CR | LF )
         //
-      /* TODO: REPLACE CODE WHEN TESTING COMPLETED!!!
+      /* TODO: REPLACE WHEN TESTING COMPLETED!!!
          if (fControlSet->contains(c2) ||
             c2 == 0x0D ||
             c2 == 0x0A)  {
@@ -2894,10 +2895,10 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         //             We do this one out-of-order because the adjustment does not change anything
         //             that would match rules LB 3 - LB 6, but after the adjustment, LB 3-6 do need to
         //             be applied.
-        rule9Adjust(prevPos, &prevChar, &pos,     &thisChar);
+        rule9Adjust(prevPos, &prevChar, &pos, &thisChar);
         nextCPPos = nextPos = fText->moveIndex32(pos, 1);
         c = fText->char32At(nextPos);
-        rule9Adjust(pos,     &thisChar, &nextPos, &c);
+        rule9Adjust(pos, &thisChar, &nextPos, &c);
 
         // If the loop is still warming up - if we haven't shifted the initial
         //   -1 positions out of prevPos yet - loop back to advance the
@@ -3373,7 +3374,7 @@ static int32_t  getIntParam(UnicodeString name, UnicodeString &params, int32_t d
             paramLength = (int32_t)(sizeof(valString)-2);
         }
         params.extract(m.start(1, status), paramLength, valString, sizeof(valString));
-        val = strtol(valString,  NULL, 10);
+        val = strtol(valString, NULL, 10);
 
         // Delete this parameter from the params string.
         m.reset();
@@ -4105,7 +4106,6 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                 currentBreakData = precedingBreaks;
             }
 
-
             if (errorType != NULL) {
                 // Format a range of the test text that includes the failure as
                 //  a data item that can be included in the rbbi test data file.
@@ -4139,16 +4139,16 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                     }
                 }
 
-                // Format looks like   "<data>\\\uabcd\uabcd\\\U0001abcd...</data>"
+                // Formatting of each line includes:
+                //   character code
+                //   reference break: '|' -> a break, '.' -> no break
+                //   actual break:    '|' -> a break, '.' -> no break
+                //   (name of character clase)
+                //   Unicode name of character
+                // '-->' indicates location of the difference.
                 UnicodeString errorText = "  ";
-                /***if (strcmp(errorType, "next()") == 0) {
-                    startContext = 0;
-                    endContext = testText.length();
 
-                    printStringBreaks(testText, expected, expectedCount);
-                }***/
-
-                for (ci=startContext; ci<endContext;) {
+                for (ci=startContext; ci<=endContext;) {
                     UnicodeString hexChars("0123456789abcdef");
                     UChar32  c;
                     int      bn;
@@ -4157,62 +4157,49 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                     char buffer[200];
                     if (ci == i) {
                         // Where the error is
-                        sprintf(buffer, "--> %3i : ", ci);  // The position
+                        sprintf(buffer, "--> %3i : ", ci);  // Error position
                     } else {
-                        sprintf(buffer, "    %3i : ", ci);  // The position
+                        sprintf(buffer, "    %3i : ", ci);  // Context
                     }
                     errorText.append(buffer);
 
-                    // TODO: use sprintf to get the columns aligned.
+                    // BMP or SMP character in hex form
+                    int bn_top = 28;
                     if (c < 0x10000) {
-                        errorText.append("\\u");
-                        for (bn=12; bn>=0; bn-=4) {
-                            errorText.append(hexChars.charAt((c>>bn)&0xf));
-                        }
-                        errorText.append("    ");
+                        bn_top = 12;
+                        errorText.append("    \\u");  // Left pad spaces
                     } else {
                         errorText.append("\\U");
-                        for (bn=28; bn>=0; bn-=4) {
+                    }
+                    for (bn=bn_top; bn>=0; bn-=4) {
                             errorText.append(hexChars.charAt((c>>bn)&0xf));
-                        }
-                    }
-                    // Reference data.
-                    if (expectedBreaks[ci] != 0) {
-                        // This a non-error expected break position.
-                        errorText.append(" | ");
-                    } else {
-                        errorText.append(" . ");                      
-                    }
-                    if (currentBreakData[ci] != 0) {
-                        // This a non-error expected break position.
-                        errorText.append(" | ");
-                    } else {
-                        errorText.append(" . ");                      
                     }
 
-                    ci = testText.moveIndex32(ci, 1);
-
-                    // Get character description
-                    char cName[200];
-                    UErrorCode status = U_ZERO_ERROR;
-
-                    u_charName(c, U_EXTENDED_CHAR_NAME, cName, sizeof(cName), &status);
-                    // Add the class name to the error text.
-                    // the class name info, then add to the error Text.
-                    // Get the index of the character class of this character.
+                    // Indicate reference and actual break status
+                    errorText.append(expectedBreaks[ci] == 0 ? "  . " : "  | ");
+                    errorText.append(currentBreakData[ci] == 0 ? " . " : " | ");
+                    
+                    // Get the class name for the character.
                     const unsigned long classIndex = mk.classIndexFromTestTextClassIndex(c);
                     if (classIndex >=0 && charClassNames.size() > classIndex) {
                         errorText.append(" (");
                         errorText.append(charClassNames[classIndex].c_str());
                         errorText.append(")  ");
                     }
-                    errorText.append(cName);
+
+                    // Character description
+                    char cName[200];
+                    UErrorCode status = U_ZERO_ERROR;
+                    u_charName(c, U_EXTENDED_CHAR_NAME, cName, sizeof(cName), &status);                    errorText.append(cName);
                     errorText.append("\n  ");
+
+                    // Move to next character position
+                    ci = testText.moveIndex32(ci, 1);
                 }
-                errorText.append("\n");
+               // errorText.append("\n");
 
                 // Output the error
-                char  charErrorTxt[500];
+                char  charErrorTxt[1000];
                 UErrorCode status = U_ZERO_ERROR;
                 errorText.extract(charErrorTxt, sizeof(charErrorTxt), NULL, status);
                 charErrorTxt[sizeof(charErrorTxt)-1] = 0;
