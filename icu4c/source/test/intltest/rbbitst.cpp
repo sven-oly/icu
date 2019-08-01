@@ -4190,7 +4190,8 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                     // Character description
                     char cName[200];
                     UErrorCode status = U_ZERO_ERROR;
-                    u_charName(c, U_EXTENDED_CHAR_NAME, cName, sizeof(cName), &status);                    errorText.append(cName);
+                    u_charName(c, U_EXTENDED_CHAR_NAME, cName, sizeof(cName), &status);
+                    errorText.append(cName);
                     errorText.append("\n  ");
 
                     // Move to next character position
