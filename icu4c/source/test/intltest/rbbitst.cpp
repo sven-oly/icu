@@ -1549,15 +1549,26 @@ public:
     // Name of each character class, parallel with charClasses. Used for debugging output
     // of characters.
     virtual  std::vector<std::string>&     characterClassNames();
+
+    // Resize the appliedRules to be in the same size as test text size.
+    // NOTE
+    //  This function must be called before using the `appliedRules` vector.
+    void setSizeOfAppliedRules(int32_t size );
+
+    void setAppliedRule(int32_t position, const std::string &value);
+
+    std::string getAppliedRule(int32_t position);
+
     virtual ~RBBIMonkeyKind();
-    UErrorCode       deferredStatus;
+    UErrorCode deferredStatus;
     int classIndexFromTestTextClassIndex(const UChar32 c);
 
-protected:
-    RBBIMonkeyKind();
-    std::vector<std::string> classNames;
+ protected:
+     RBBIMonkeyKind();
+     std::vector<std::string> classNames;
+     std::vector<std::string> appliedRules;
 
-private:
+ private:
 };
 
 RBBIMonkeyKind::RBBIMonkeyKind() {
@@ -1569,6 +1580,18 @@ RBBIMonkeyKind::~RBBIMonkeyKind() {
 
 std::vector<std::string>& RBBIMonkeyKind::characterClassNames() {
     return classNames;
+}
+
+void RBBIMonkeyKind::setSizeOfAppliedRules(int32_t size) {
+    appliedRules.resize(size);
+}
+
+void RBBIMonkeyKind::setAppliedRule(int32_t position, const std::string &value) {
+    appliedRules[position] = value;
+}
+
+std::string RBBIMonkeyKind::getAppliedRule(int32_t position){
+    return appliedRules[position];
 }
 
 int RBBIMonkeyKind::classIndexFromTestTextClassIndex(const UChar32 c) {
@@ -1723,6 +1746,7 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
     if (prevPos >= fText->length()) {
         return -1;
     }
+
     p0 = p1 = p2 = p3 = prevPos;
     c3 =  fText->char32At(prevPos);
     c0 = c1 = c2 = cBase = 0;
