@@ -1790,13 +1790,11 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
 
         // Rule (GB5)    <break>  ( Control | CR | LF )
         //
-      /* TODO: REPLACE WHEN TESTING COMPLETED!!!
          if (fControlSet->contains(c2) ||
             c2 == 0x0D ||
             c2 == 0x0A)  {
             break;
         }
-      */
 
         // Rule (GB6)  L x ( L | V | LV | LVT )
         if (fLSet->contains(c1) &&
@@ -2057,6 +2055,8 @@ int32_t RBBIWordMonkey::next(int32_t prevPos) {
 
     int     breakPos = -1;
 
+    std::string appliedRule = "";
+
     UChar32 c0, c1, c2, c3;   // The code points at p0, p1, p2 & p3.
 
     if (U_FAILURE(deferredStatus)) {
@@ -2079,7 +2079,7 @@ int32_t RBBIWordMonkey::next(int32_t prevPos) {
         p1 = p2;  c1 = c2;
         p2 = p3;  c2 = c3;
 
-        // Advancd p3 by    X(Extend | Format)*   Rule 4
+        // Advanced p3 by    X(Extend | Format)*   Rule 4
         //    But do not advance over Extend & Format following a new line. (Unicode 5.1 change)
         do {
             p3 = fText->moveIndex32(p3, 1);
@@ -2095,141 +2095,163 @@ int32_t RBBIWordMonkey::next(int32_t prevPos) {
             // Still warming up the loop.  (won't work with zero length strings, but we don't care)
             continue;
         }
+
         if (p2 == fText->length()) {
             // Reached end of string.  Always a break position.
             break;
         }
 
-        // Rule  (3)   CR x LF
+        appliedRule = "Rule  (3)   CR x LF";
         //     No Extend or Format characters may appear between the CR and LF,
         //     which requires the additional check for p2 immediately following p1.
         //
         if (c1==0x0D && c2==0x0A) {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (3a)  Break before and after newlines (including CR and LF)
-        //
-        if (fCRSet->contains(c1) || fLFSet->contains(c1) || fNewlineSet->contains(c1)) {
+        appliedRule = "Rule (3a)  Break before and after newlines (including CR and LF)";
+        if (fCRSet->contains(c1) || fLFSet->contains(c1) || fNewlineSet->contains(c1))
+        {
+            setAppliedRule(p2, appliedRule);
             break;
         };
         if (fCRSet->contains(c2) || fLFSet->contains(c2) || fNewlineSet->contains(c2)) {
+            setAppliedRule(p2, appliedRule);
             break;
         };
 
-        // Rule (3c)    ZWJ x Extended_Pictographic
+        appliedRule = "Rule (3c)    ZWJ x Extended_Pictographic";
         //              Not ignoring extend chars, so peek into input text to
         //              get the potential ZWJ, the character immediately preceding c2.
         //              Sloppy UChar32 indexing: p2-1 may reference trail half
         //              but char32At will get the full code point.
-        if (fZWJSet->contains(fText->char32At(p2-1)) && fExtendedPictSet->contains(c2)) {
+        if (fZWJSet->contains(fText->char32At(p2 - 1)) && fExtendedPictSet->contains(c2)){
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (3d)    Keep horizontal whitespace together.
+        appliedRule = "Rule (3d)    Keep horizontal whitespace together.";
         if (fWSegSpaceSet->contains(fText->char32At(p2-1)) && fWSegSpaceSet->contains(c2)) {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (5).   (ALetter | Hebrew_Letter) x (ALetter | Hebrew_Letter)
+        appliedRule = "Rule (5).   (ALetter | Hebrew_Letter) x (ALetter | Hebrew_Letter)";
         if ((fALetterSet->contains(c1) || fHebrew_LetterSet->contains(c1)) &&
             (fALetterSet->contains(c2) || fHebrew_LetterSet->contains(c2)))  {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (6)  (ALetter | Hebrew_Letter)  x  (MidLetter | MidNumLet | Single_Quote) (ALetter | Hebrew_Letter)
-        //
+        appliedRule = "Rule (6)  (ALetter | Hebrew_Letter)  x  (MidLetter | MidNumLet | Single_Quote) (ALetter | Hebrew_Letter)";
         if ( (fALetterSet->contains(c1) || fHebrew_LetterSet->contains(c1))   &&
              (fMidLetterSet->contains(c2) || fMidNumLetSet->contains(c2) || fSingle_QuoteSet->contains(c2)) &&
              (fALetterSet->contains(c3) || fHebrew_LetterSet->contains(c3))) {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (7)  (ALetter | Hebrew_Letter) (MidLetter | MidNumLet | Single_Quote)  x  (ALetter | Hebrew_Letter)
+        appliedRule = "Rule (7)  (ALetter | Hebrew_Letter) (MidLetter | MidNumLet | Single_Quote)  x  (ALetter | Hebrew_Letter)";
         if ((fALetterSet->contains(c0) || fHebrew_LetterSet->contains(c0)) &&
             (fMidLetterSet->contains(c1) || fMidNumLetSet->contains(c1) || fSingle_QuoteSet->contains(c1)) &&
             (fALetterSet->contains(c2) || fHebrew_LetterSet->contains(c2))) {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (7a)     Hebrew_Letter x Single_Quote
+        appliedRule = "Rule (7a)     Hebrew_Letter x Single_Quote";
         if (fHebrew_LetterSet->contains(c1) && fSingle_QuoteSet->contains(c2)) {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (7b)    Hebrew_Letter x Double_Quote Hebrew_Letter
+        appliedRule = "Rule (7b)    Hebrew_Letter x Double_Quote Hebrew_Letter";
         if (fHebrew_LetterSet->contains(c1) && fDouble_QuoteSet->contains(c2) && fHebrew_LetterSet->contains(c3)) {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (7c)    Hebrew_Letter Double_Quote x Hebrew_Letter
+        appliedRule = "Rule (7c)    Hebrew_Letter Double_Quote x Hebrew_Letter";
         if (fHebrew_LetterSet->contains(c0) && fDouble_QuoteSet->contains(c1) && fHebrew_LetterSet->contains(c2)) {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (8)    Numeric x Numeric
+        appliedRule = "Rule (8)    Numeric x Numeric";
         if (fNumericSet->contains(c1) &&
             fNumericSet->contains(c2))  {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (9)    (ALetter | Hebrew_Letter) x Numeric
+        appliedRule = "Rule (9)    (ALetter | Hebrew_Letter) x Numeric";
         if ((fALetterSet->contains(c1) || fHebrew_LetterSet->contains(c1)) &&
             fNumericSet->contains(c2))  {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (10)    Numeric x (ALetter | Hebrew_Letter)
+        appliedRule = "Rule (10)    Numeric x (ALetter | Hebrew_Letter)";
         if (fNumericSet->contains(c1) &&
             (fALetterSet->contains(c2) || fHebrew_LetterSet->contains(c2)))  {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (11)   Numeric (MidNum | MidNumLet | Single_Quote)  x  Numeric
+        appliedRule = "Rule (11)   Numeric (MidNum | MidNumLet | Single_Quote)  x  Numeric";
         if (fNumericSet->contains(c0) &&
             (fMidNumSet->contains(c1) || fMidNumLetSet->contains(c1) || fSingle_QuoteSet->contains(c1))  &&
             fNumericSet->contains(c2)) {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (12)  Numeric x (MidNum | MidNumLet | SingleQuote) Numeric
+        appliedRule = "Rule (12)  Numeric x (MidNum | MidNumLet | SingleQuote) Numeric";
         if (fNumericSet->contains(c1) &&
             (fMidNumSet->contains(c2) || fMidNumLetSet->contains(c2) || fSingle_QuoteSet->contains(c2))  &&
             fNumericSet->contains(c3)) {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (13)  Katakana x Katakana
+        appliedRule = "Rule (13)  Katakana x Katakana";
         //            Note: matches UAX 29 rules, but doesn't come into play for ICU because
         //                  all Katakana are handled by the dictionary breaker.
         if (fKatakanaSet->contains(c1) &&
             fKatakanaSet->contains(c2))  {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule 13a    (ALetter | Hebrew_Letter | Numeric | KataKana | ExtendNumLet) x ExtendNumLet
+        appliedRule = "Rule 13a    (ALetter | Hebrew_Letter | Numeric | KataKana | ExtendNumLet) x ExtendNumLet";
         if ((fALetterSet->contains(c1) || fHebrew_LetterSet->contains(c1) ||fNumericSet->contains(c1) ||
              fKatakanaSet->contains(c1) || fExtendNumLetSet->contains(c1)) &&
              fExtendNumLetSet->contains(c2)) {
-                continue;
+            setAppliedRule(p2, appliedRule);
+            continue;
         }
 
-        // Rule 13b   ExtendNumLet x (ALetter | Hebrew_Letter | Numeric | Katakana)
+        appliedRule = "Rule 13b   ExtendNumLet x (ALetter | Hebrew_Letter | Numeric | Katakana)";
         if (fExtendNumLetSet->contains(c1) &&
                 (fALetterSet->contains(c2) || fHebrew_LetterSet->contains(c2) ||
                  fNumericSet->contains(c2) || fKatakanaSet->contains(c2)))  {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule 15 - 17   Group pairs of Regional Indicators.
+        appliedRule = "Rule 15 - 17   Group pairs of Regional Indicators.";
         if (fRegionalIndicatorSet->contains(c0) && fRegionalIndicatorSet->contains(c1)) {
+            setAppliedRule(p2, appliedRule);
             break;
         }
         if (fRegionalIndicatorSet->contains(c1) && fRegionalIndicatorSet->contains(c2)) {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule 999.  Break found here.
+        appliedRule = "Rule 999.  Break found here.";
+        setAppliedRule(p2, appliedRule);
         break;
     }
 
@@ -3958,6 +3980,9 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
     char             precedingBreaks[TESTSTRINGLEN*2+1];
     int              i;
     int              loopCount = 0;
+
+    // Set the size of applied rules to be as same as `TESTSTRINGLEN`
+    mk.setSizeOfAppliedRules(TESTSTRINGLEN);
 
     m_seed = seed;
 
