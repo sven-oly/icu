@@ -3980,9 +3980,6 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
             return;
         }
     }
-
-    // Create an array of the character class indices.
-    int testTextClassIndex[TESTSTRINGLEN*2 + 1];
     
     while (loopCount < numIterations || numIterations == -1) {
         if (numIterations == -1 && loopCount % 10 == 0) {
@@ -4012,7 +4009,6 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
             }
 
             testText.append(c);
-            testTextClassIndex[i] = aClassNum;  // TODO: make sure this is the right index for the code point.
         }
 
         // Calculate the expected results for this test string.
@@ -4230,12 +4226,11 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                     UErrorCode status = U_ZERO_ERROR;
                     u_charName(c, U_EXTENDED_CHAR_NAME, cName, sizeof(cName), &status);
                     errorText.append(cName);
-                    errorText.append("\n  ");
+                    errorText.append("\n");
 
                     // Move to next character position
                     ci = testText.moveIndex32(ci, 1);
                 }
-               // errorText.append("\n");
 
                 // Output the error
                 char  charErrorTxt[1000];
