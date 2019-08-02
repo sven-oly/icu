@@ -1548,7 +1548,7 @@ public:
 
     // Name of each character class, parallel with charClasses. Used for debugging output
     // of characters.
-    virtual  std::vector<std::string>     characterClassNames();
+    virtual  std::vector<std::string>&     characterClassNames();
     virtual ~RBBIMonkeyKind();
     UErrorCode       deferredStatus;
     int classIndexFromTestTextClassIndex(const UChar32 c);
@@ -1567,7 +1567,7 @@ RBBIMonkeyKind::RBBIMonkeyKind() {
 RBBIMonkeyKind::~RBBIMonkeyKind() {
 }
 
-std::vector<std::string> RBBIMonkeyKind::characterClassNames() {
+std::vector<std::string>& RBBIMonkeyKind::characterClassNames() {
     return classNames;
 }
 
