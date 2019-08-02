@@ -1550,10 +1550,10 @@ public:
     // of characters.
     virtual  std::vector<std::string>&     characterClassNames();
 
-    // Resize the appliedRules to be in the same size as test text size.
+    // Clear `appliedRules` and fill it with empty strings in the size of test text.
     // NOTE
-    //  This function must be called before using the `appliedRules` vector.
-    void setSizeOfAppliedRules(int32_t size );
+    //  This function must be called before using `appliedRules`.
+    void prepareAppliedRules(int32_t size );
 
     void setAppliedRule(int32_t position, const std::string &value);
 
@@ -1582,7 +1582,8 @@ std::vector<std::string>& RBBIMonkeyKind::characterClassNames() {
     return classNames;
 }
 
-void RBBIMonkeyKind::setSizeOfAppliedRules(int32_t size) {
+void RBBIMonkeyKind::prepareAppliedRules(int32_t size) {
+    appliedRules.clear();
     appliedRules.resize(size);
 }
 
@@ -4067,8 +4068,6 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
     int              i;
     int              loopCount = 0;
 
-    // Set the size of applied rules to be as same as `TESTSTRINGLEN`
-    mk.setSizeOfAppliedRules(TESTSTRINGLEN);
 
     m_seed = seed;
 
@@ -4124,6 +4123,10 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
 
         // Calculate the expected results for this test string.
         mk.setText(testText);
+        
+        // Resize the applied rules vector.
+        mk.prepareAppliedRules(testText.length());
+
         memset(expectedBreaks, 0, sizeof(expectedBreaks));
         expectedBreaks[0] = 1;
         int32_t breakPos = 0;
