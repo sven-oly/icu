@@ -2079,7 +2079,7 @@ int32_t RBBIWordMonkey::next(int32_t prevPos) {
         p1 = p2;  c1 = c2;
         p2 = p3;  c2 = c3;
 
-        // Advanced p3 by    X(Extend | Format)*   Rule 4
+        // Advance p3 by    X(Extend | Format)*   Rule 4
         //    But do not advance over Extend & Format following a new line. (Unicode 5.1 change)
         do {
             p3 = fText->moveIndex32(p3, 1);
@@ -2448,6 +2448,8 @@ int32_t RBBISentMonkey::next(int32_t prevPos) {
 
     int     breakPos = -1;
 
+    std::string appliedRule = "";
+
     UChar32 c0, c1, c2, c3;   // The code points at p0, p1, p2 & p3.
     UChar32 c;
 
@@ -2471,45 +2473,52 @@ int32_t RBBISentMonkey::next(int32_t prevPos) {
         p1 = p2;  c1 = c2;
         p2 = p3;  c2 = c3;
 
-        // Advancd p3 by    X(Extend | Format)*   Rule 4
+        // Advance p3 by    X(Extend | Format)*   Rule 4
         p3 = moveForward(p3);
         c3 = cAt(p3);
 
-        // Rule (3)  CR x LF
+        appliedRule = "Rule (3)  CR x LF";
         if (c1==0x0d && c2==0x0a && p2==(p1+1)) {
             // TODO: set a string that this rule was used
             // Such as ???? = "Rule 3"
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (4).   Sep  <break>
+        appliedRule = "Rule (4).   Sep  <break>";
         if (fSepSet->contains(c1)) {
             p2 = p1+1;   // Separators don't combine with Extend or Format.
+            
+            setAppliedRule(p2, appliedRule);
             break;
         }
 
         if (p2 >= fText->length()) {
             // Reached end of string.  Always a break position.
+            setAppliedRule(p2, appliedRule);
             break;
         }
 
         if (p2 == prevPos) {
             // Still warming up the loop.  (won't work with zero length strings, but we don't care)
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (6).   ATerm x Numeric
+        appliedRule = "Rule (6).   ATerm x Numeric";
         if (fATermSet->contains(c1) &&  fNumericSet->contains(c2))  {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (7).  (Upper | Lower) ATerm  x  Uppper
+        appliedRule = "Rule (7).  (Upper | Lower) ATerm  x  Uppper";
         if ((fUpperSet->contains(c0) || fLowerSet->contains(c0)) &&
                 fATermSet->contains(c1) && fUpperSet->contains(c2)) {
+            setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        // Rule (8)  ATerm Close* Sp*  x  (not (OLettter | Upper | Lower | Sep | STerm | ATerm))* Lower
+        appliedRule = "Rule (8)  ATerm Close* Sp*  x  (not (OLettter | Upper | Lower | Sep | STerm | ATerm))* Lower";
         //           Note:  STerm | ATerm are added to the negated part of the expression by a
         //                  note to the Unicode 5.0 documents.
         int p8 = p1;
@@ -2526,16 +2535,20 @@ int32_t RBBISentMonkey::next(int32_t prevPos) {
                 if (c==-1 || fOLetterSet->contains(c) || fUpperSet->contains(c) ||
                     fLowerSet->contains(c) || fSepSet->contains(c) ||
                     fATermSet->contains(c) || fSTermSet->contains(c))  {
+
+                    setAppliedRule(p2, appliedRule);
                     break;
                 }
                 p8 = moveForward(p8);
             }
             if (fLowerSet->contains(cAt(p8))) {
+
+                setAppliedRule(p2, appliedRule);
                 continue;
             }
         }
 
-        // Rule 8a   (STerm | ATerm) Close* Sp* x (SContinue | STerm | ATerm);
+        appliedRule = "Rule 8a   (STerm | ATerm) Close* Sp* x (SContinue | STerm | ATerm)";
         if (fSContinueSet->contains(c2) || fSTermSet->contains(c2) || fATermSet->contains(c2)) {
             p8 = p1;
             while (fSpSet->contains(cAt(p8))) {
@@ -2546,11 +2559,13 @@ int32_t RBBISentMonkey::next(int32_t prevPos) {
             }
             c = cAt(p8);
             if (fSTermSet->contains(c) || fATermSet->contains(c)) {
+
+                setAppliedRule(p2, appliedRule);
                 continue;
             }
         }
 
-        // Rule (9)  (STerm | ATerm) Close*  x  (Close | Sp | Sep | CR | LF)
+        appliedRule = "Rule (9)  (STerm | ATerm) Close*  x  (Close | Sp | Sep | CR | LF)";
         int p9 = p1;
         while (fCloseSet->contains(cAt(p9))) {
             p9 = moveBack(p9);
@@ -2558,11 +2573,13 @@ int32_t RBBISentMonkey::next(int32_t prevPos) {
         c = cAt(p9);
         if ((fSTermSet->contains(c) || fATermSet->contains(c))) {
             if (fCloseSet->contains(c2) || fSpSet->contains(c2) || fSepSet->contains(c2)) {
+
+                setAppliedRule(p2, appliedRule);
                 continue;
             }
         }
 
-        // Rule (10)  (Sterm | ATerm) Close* Sp*  x  (Sp | Sep | CR | LF)
+        appliedRule = "Rule (10)  (Sterm | ATerm) Close* Sp*  x  (Sp | Sep | CR | LF)";
         int p10 = p1;
         while (fSpSet->contains(cAt(p10))) {
             p10 = moveBack(p10);
@@ -2572,11 +2589,12 @@ int32_t RBBISentMonkey::next(int32_t prevPos) {
         }
         if (fSTermSet->contains(cAt(p10)) || fATermSet->contains(cAt(p10))) {
             if (fSpSet->contains(c2) || fSepSet->contains(c2)) {
+                setAppliedRule(p2, appliedRule);
                 continue;
             }
         }
 
-        // Rule (11)  (STerm | ATerm) Close* Sp* (Sep | CR | LF)?  <break>
+        appliedRule = "Rule (11)  (STerm | ATerm) Close* Sp* (Sep | CR | LF)?  <break>";
         int p11 = p1;
         if (fSepSet->contains(cAt(p11))) {
             p11 = moveBack(p11);
@@ -2588,12 +2606,15 @@ int32_t RBBISentMonkey::next(int32_t prevPos) {
             p11 = moveBack(p11);
         }
         if (fSTermSet->contains(cAt(p11)) || fATermSet->contains(cAt(p11))) {
+            setAppliedRule(p2, appliedRule);
             break;
         }
 
-        //  Rule (12)  Any x Any
+        appliedRule = "Rule (12)  Any x Any";
+        setAppliedRule(p2, appliedRule);
         continue;
     }
+    
     breakPos = p2;
     return breakPos;
 }
