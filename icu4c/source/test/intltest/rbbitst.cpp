@@ -2886,10 +2886,12 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         nextCPPos = fText->moveIndex32(pos, 1);
         nextPos   = nextCPPos;
 
+
         // Rule LB2 - Break at end of text.
         if (pos >= fText->length()) {
             break;
         }
+
 
         // Rule LB 9 - adjust for combining sequences.
         //             We do this one out-of-order because the adjustment does not change anything
@@ -2907,10 +2909,12 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
             continue;
         }
 
+
         // LB 4  Always break after hard line breaks,
         if (fBK->contains(prevChar)) {
             break;
         }
+
 
         // LB 5  Break after CR, LF, NL, but not inside CR LF
         if (prevChar == 0x0d && thisChar == 0x0a) {
@@ -2921,6 +2925,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
             prevChar == 0x85)  {
             break;
         }
+
 
         // LB 6  Don't break before hard line breaks
         if (thisChar == 0x0d || thisChar == 0x0a || thisChar == 0x85 ||
@@ -2938,6 +2943,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
             continue;
         }
 
+
         // LB 8  Break after zero width space
         //       ZW SP* ÷
         //       Scan backwards from prevChar for SP* ZW
@@ -2948,6 +2954,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         if (fZW->contains(fText->char32At(tPos))) {
             break;
         }
+
 
         // LB 25    Numbers
         //          Move this test up, before LB8a, because numbers can match a longer sequence that would
@@ -2975,6 +2982,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
             }
         }
 
+
         // LB 8a ZWJ x
         //       The monkey test's way of ignoring combining characters doesn't work
         //       for this rule. ZJ is also a CM. Need to get the actual character
@@ -2986,6 +2994,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
                 continue;
             }
         }
+
 
         // LB 9, 10  Already done, at top of loop.
         //
@@ -2999,11 +3008,13 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
             continue;
         }
 
+
         // LB 12
         //    GL  x
         if (fGL->contains(prevChar)) {
             continue;
         }
+
 
         // LB 12a
         //    [^SP BA HY] x GL
@@ -3013,6 +3024,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
             continue;
         }
 
+
         // LB 13  Don't break before closings.
         //
         if (fCL->contains(thisChar) ||
@@ -3021,6 +3033,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
                 fSY->contains(thisChar)) {
             continue;
         }
+
 
         // LB 14 Don't break after OP SP*
         //       Scan backwards, checking for this sequence.
@@ -3054,10 +3067,12 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
             }
         }
 
+
         // LB14b Do not break before numeric separators, even after spaces.
         if (fIS->contains(thisChar)) {
             continue;
         }
+
 
         // LB 15    QU SP* x OP
         if (fOP->contains(thisChar)) {
@@ -3073,7 +3088,6 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
                 continue;
             }
         }
-
 
 
         // LB 16   (CL | CP) SP* x NS
