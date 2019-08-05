@@ -1583,7 +1583,9 @@ std::vector<std::string>& RBBIMonkeyKind::characterClassNames() {
 }
 
 void RBBIMonkeyKind::prepareAppliedRules(int32_t size) {
+    // Remove all the information in the `appliedRules`.
     appliedRules.clear();
+
     appliedRules.resize(size);
 }
 
