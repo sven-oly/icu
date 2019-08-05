@@ -1702,7 +1702,6 @@ RBBICharMonkey::RBBICharMonkey() {
     fSets             = new UVector(status);
 
     // Important: Keep class names the same as the class contents.
-    // TODO: Consider structure to create and store sets with same names.
     fSets->addElement(fCRLFSet, status); classNames.push_back("CRLF");
     fSets->addElement(fControlSet, status); classNames.push_back("Control");
     fSets->addElement(fExtendSet, status); classNames.push_back("Extended");
@@ -1797,12 +1796,11 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
         }
 
         appliedRule = "Rule (GB5)    <break>  ( Control | CR | LF )";
-        //
-         if (fControlSet->contains(c2) ||
+        if (fControlSet->contains(c2) ||
             c2 == 0x0D ||
             c2 == 0x0A)  {
-             setAppliedRule(p2, appliedRule);
-             break;
+            setAppliedRule(p2, appliedRule);
+            break;
         }
 
         appliedRule = "Rule (GB6)  L x ( L | V | LV | LVT )";
@@ -1840,11 +1838,9 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
 
         appliedRule = "Rule (GB9a)   x  SpacingMark";
         
-       if (fSpacingSet->contains(c2)) {
-                       setAppliedRule(p2, appliedRule);
-
-            // TODO !!! continue;
-            break;
+        if (fSpacingSet->contains(c2)) {
+            setAppliedRule(p2, appliedRule);
+            continue;
         }
     
         appliedRule = "Rule (GB9b)   Prepend x";
@@ -2501,8 +2497,6 @@ int32_t RBBISentMonkey::next(int32_t prevPos) {
 
         appliedRule = "Rule (3)  CR x LF";
         if (c1==0x0d && c2==0x0a && p2==(p1+1)) {
-            // TODO: set a string that this rule was used
-            // Such as ???? = "Rule 3"
             setAppliedRule(p2, appliedRule);
             continue;
         }
@@ -4062,7 +4056,6 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
     UnicodeString    testText;
     int32_t          numCharClasses;
     UVector          *chClasses;
-    int              expected[TESTSTRINGLEN*2 + 1];
     int              expectedCount = 0;
     char             expectedBreaks[TESTSTRINGLEN*2 + 1];
     char             forwardBreaks[TESTSTRINGLEN*2 + 1];
@@ -4146,9 +4139,6 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
             }
             expectedBreaks[breakPos] = 1;
             U_ASSERT(expectedCount<testText.length());
-            expected[expectedCount ++] = breakPos;
-            (void)expected;   // Set but not used warning.
-                              // TODO (andy): check it out.
         }
 
         // Find the break positions using forward iteration
@@ -4304,56 +4294,39 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                 for (ci=startContext; ci<=endContext;) {
                     UnicodeString hexChars("0123456789abcdef");
                     UChar32  c;
-                    int      bn;
                     c = testText.char32At(ci);
                     
                     char buffer[200];
+                    std::string format = "    %3i : ";
                     if (ci == i) {
-                        // Where the error is
-                        sprintf(buffer, "--> %3i : ", ci);  // Error position
-                    } else {
-                        sprintf(buffer, "    %3i : ", ci);  // Context
+                        format =  "--> %3i : ";  // Error position
                     }
+                    sprintf(buffer, format.c_str(), ci);
                     errorText.append(buffer);
 
-                    // BMP or SMP character in hex form
-                    int bn_top = 28;
-                    if (c < 0x10000) {
-                        bn_top = 12;
-                        errorText.append("    \\u");  // Left pad spaces
-                    } else {
-                        errorText.append("\\U");
+                    // BMP or SMP character in hex
+                    format = "    \\u%04x";
+                    if (c >= 0x10000) {
+                        format = "\\U%08x";
                     }
-                    for (bn=bn_top; bn>=0; bn-=4) { // TODO(sven-oly): add comments here
-                            errorText.append(hexChars.charAt((c>>bn)&0xf));
-                    }
+                    sprintf(buffer, format.c_str(), c);
+                    errorText.append(buffer);
 
                     // Indicate reference and actual break status
                     errorText.append(expectedBreaks[ci] == 0 ? "  . " : "  | ");
                     errorText.append(currentBreakData[ci] == 0 ? " . " : " | ");
                     
-                    // Get the class name for the character.
+                    // Get the class name and character name for the character.
                     const unsigned long classIndex = mk.classIndexFromTestTextClassIndex(c);
-                    if (classIndex >=0 && charClassNames.size() > classIndex) {
-                    //    errorText.append(" (");
-                    //    errorText.append(charClassNames[classIndex].c_str());
-                    //    errorText.append(")  ");
-                    }
-
-                    // Get applied rule
-                    const std::string appliedRule = mk.getAppliedRule(ci);
-                    // errorText.append(" (");
-                    // errorText.append(appliedRule.c_str());
-                    // errorText.append(")  ");
-
-                    // Character description
                     char cName[200];
                     UErrorCode status = U_ZERO_ERROR;
                     u_charName(c, U_EXTENDED_CHAR_NAME, cName, sizeof(cName), &status);
-                    // errorText.append(cName);
-                    // errorText.append("\n");
 
-                    sprintf(buffer, "%15s  %20s -->>>  %20s\n", charClassNames[classIndex].c_str(), cName, appliedRule.c_str());
+                    // The applied rule string
+                    const std::string appliedRule = mk.getAppliedRule(ci);
+
+                    sprintf(buffer, "%15s  %20s -->>>  %20s\n", 
+                        charClassNames[classIndex].c_str(), cName, appliedRule.c_str());
                     errorText.append(buffer);
 
                     // Move to next character position
@@ -4361,7 +4334,7 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                 }
 
                 // Output the error
-                char  charErrorTxt[1000];
+                char  charErrorTxt[1500];
                 UErrorCode status = U_ZERO_ERROR;
                 errorText.extract(charErrorTxt, sizeof(charErrorTxt), NULL, status);
                 charErrorTxt[sizeof(charErrorTxt)-1] = 0;
