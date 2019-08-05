@@ -1586,7 +1586,7 @@ void RBBIMonkeyKind::prepareAppliedRules(int32_t size) {
     // Remove all the information in the `appliedRules`.
     appliedRules.clear();
 
-    appliedRules.resize(size);
+    appliedRules.resize(size * 2 + 1);
 }
 
 void RBBIMonkeyKind::setAppliedRule(int32_t position, const std::string &value) {
@@ -1839,11 +1839,14 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
         }
 
         appliedRule = "Rule (GB9a)   x  SpacingMark";
-        /* TEMPORARY!!!
+        
        if (fSpacingSet->contains(c2)) {
-            continue;
+                       setAppliedRule(p2, appliedRule);
+
+            // TODO !!! continue;
+            break;
         }
-    */
+    
         appliedRule = "Rule (GB9b)   Prepend x";
         if (fPrependSet->contains(c1)) {
             setAppliedRule(p2, appliedRule);
@@ -4338,7 +4341,7 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                     }
 
                     // Get applied rule
-                    const std::string appliedRule = mk.getAppliedRule(i);
+                    const std::string appliedRule = mk.getAppliedRule(ci);
                     errorText.append(" (");
                     errorText.append(appliedRule.c_str());
                     errorText.append(")  ");
