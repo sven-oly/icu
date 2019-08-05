@@ -4335,23 +4335,26 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                     // Get the class name for the character.
                     const unsigned long classIndex = mk.classIndexFromTestTextClassIndex(c);
                     if (classIndex >=0 && charClassNames.size() > classIndex) {
-                        errorText.append(" (");
-                        errorText.append(charClassNames[classIndex].c_str());
-                        errorText.append(")  ");
+                    //    errorText.append(" (");
+                    //    errorText.append(charClassNames[classIndex].c_str());
+                    //    errorText.append(")  ");
                     }
 
                     // Get applied rule
                     const std::string appliedRule = mk.getAppliedRule(ci);
-                    errorText.append(" (");
-                    errorText.append(appliedRule.c_str());
-                    errorText.append(")  ");
+                    // errorText.append(" (");
+                    // errorText.append(appliedRule.c_str());
+                    // errorText.append(")  ");
 
                     // Character description
                     char cName[200];
                     UErrorCode status = U_ZERO_ERROR;
                     u_charName(c, U_EXTENDED_CHAR_NAME, cName, sizeof(cName), &status);
-                    errorText.append(cName);
-                    errorText.append("\n");
+                    // errorText.append(cName);
+                    // errorText.append("\n");
+
+                    sprintf(buffer, "%15s  %20s -->>>  %20s\n", charClassNames[classIndex].c_str(), cName, appliedRule.c_str());
+                    errorText.append(buffer);
 
                     // Move to next character position
                     ci = testText.moveIndex32(ci, 1);
