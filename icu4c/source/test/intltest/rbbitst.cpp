@@ -4289,10 +4289,15 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                 //   (name of character clase)
                 //   Unicode name of character
                 //   '-->' indicates location of the difference.
-                UnicodeString errorText = "";
+
+                UErrorCode status = U_ZERO_ERROR;
+                const char *badLocale = bi->getLocaleID(ULOC_ACTUAL_LOCALE, status);
+                errln("\n%s break monkey test error [%s].  %s. Operation = %s; Random seed = %d;  buf Idx = %d",
+                    name, badLocale, (expectedBreaks[i]? "break expected but not found" : "break found but not expected"),
+                    errorType, seed, i);
 
                 for (ci=startContext; ci<=endContext;) {
-                    UnicodeString hexChars("0123456789abcdef");
+                    UnicodeString errorText = "";
                     UChar32  c;
                     c = testText.char32At(ci);
                     
@@ -4325,24 +4330,24 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                     // The applied rule string
                     const std::string appliedRule = mk.getAppliedRule(ci);
 
-                    sprintf(buffer, "%15s  %20s -->>>  %20s\n", 
+                    sprintf(buffer, "%15s  %20s -->>>  %20s", 
                         charClassNames[classIndex].c_str(), cName, appliedRule.c_str());
                     errorText.append(buffer);
 
                     // Move to next character position
+                    int ci_old = ci;
                     ci = testText.moveIndex32(ci, 1);
+                    if (ci == ci_old) {
+                        // Force the loop to skip. This may occur with \ufff at end.
+                        ci = endContext + 1;
+                    }
+
+                    // Output the error
+                    char  charErrorTxt[500];
+                    errorText.extract(charErrorTxt, sizeof(charErrorTxt), NULL, status);
+                    charErrorTxt[sizeof(charErrorTxt)-1] = 0;
+                    errln("%s", charErrorTxt);
                 }
-
-                // Output the error
-                char  charErrorTxt[1500];
-                UErrorCode status = U_ZERO_ERROR;
-                errorText.extract(charErrorTxt, sizeof(charErrorTxt), NULL, status);
-                charErrorTxt[sizeof(charErrorTxt)-1] = 0;
-                const char *badLocale = bi->getLocaleID(ULOC_ACTUAL_LOCALE, status);
-
-                errln("%s break monkey test error [%s].  %s. Operation = %s; Random seed = %d;  buf Idx = %d\n%s",
-                    name, badLocale, (expectedBreaks[i]? "break expected but not found" : "break found but not expected"),
-                    errorType, seed, i, charErrorTxt);
                 break;
             }
         }
