@@ -3675,6 +3675,7 @@ void RBBITest::TestWordBreaks(void)
         int expectedcount = 0;
 
         monkey.setText(ustr);
+        monkey.prepareAppliedRules(50 * 2 + 1);
         int i;
         for (i = 0; i != BreakIterator::DONE; i = monkey.next(i)) {
             expected[expectedcount ++] = i;
@@ -3848,6 +3849,8 @@ void RBBITest::TestLineBreaks(void)
         int expectedcount = 0;
 
         monkey.setText(ustr);
+        monkey.prepareAppliedRules(50 * 2 + 1);
+
         int i;
         for (i = 0; i != BreakIterator::DONE; i = monkey.next(i)) {
             if (expectedcount >= EXPECTEDSIZE) {
@@ -3912,6 +3915,8 @@ void RBBITest::TestSentBreaks(void)
         int expectedcount = 0;
 
         monkey.setText(ustr);
+        monkey.prepareAppliedRules(50 * 2 + 1);
+
         int i;
         for (i = 0; i != BreakIterator::DONE; i = monkey.next(i)) {
             if (expectedcount >= EXPECTEDSIZE) {
