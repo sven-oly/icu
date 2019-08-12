@@ -57,6 +57,11 @@
 #define TEST_ASSERT_SUCCESS(errcode) { if (U_FAILURE(errcode)) { \
     errcheckln(errcode, "Failure in file %s, line %d, status = \"%s\"", __FILE__, __LINE__, u_errorName(errcode));}}
 
+#define MONKEY_ERROR(msg, fRuleFileName, index, seed) { \
+    IntlTest::gTest->errln("\n%s:%d %s at index %d. Parameters to reproduce: @\"type=%s seed=%u loop=1\"", \
+                    __FILE__, __LINE__, msg, index, fRuleFileName, seed); \
+}
+
 //---------------------------------------------
 // runIndexedTest
 //---------------------------------------------
@@ -1561,7 +1566,9 @@ public:
 
     virtual ~RBBIMonkeyKind();
     UErrorCode deferredStatus;
-    int classIndexFromTestTextClassIndex(const UChar32 c);
+
+    std::string classNameFromCodepoint(const UChar32 c);
+    unsigned int maxClassNameSize();
 
  protected:
      RBBIMonkeyKind();
@@ -1597,15 +1604,26 @@ std::string RBBIMonkeyKind::getAppliedRule(int32_t position){
     return appliedRules[position];
 }
 
-int RBBIMonkeyKind::classIndexFromTestTextClassIndex(const UChar32 c) {
+std::string RBBIMonkeyKind::classNameFromCodepoint(const UChar32 c) {
     // Simply iterate through charClasses to find character's class
     for (int aClassNum = 0; aClassNum < charClasses()->size(); aClassNum++) {
         UnicodeSet *classSet = (UnicodeSet *)charClasses()->elementAt(aClassNum);
         if (classSet->contains(c)) {
-            return aClassNum;
+            return classNames[aClassNum];
         }
     }
-    return -1; // This should not happen.
+    U_ASSERT(FALSE);  // This should not happen.
+    return "bad class name";
+}
+
+unsigned int RBBIMonkeyKind::maxClassNameSize() {
+    unsigned int maxSize = 0;
+    for (int aClassNum = 0; aClassNum < charClasses()->size(); aClassNum++) {
+        if (classNames[aClassNum].size() > maxSize) {
+            maxSize = classNames[aClassNum].size();
+        }
+    }
+    return maxSize;
 }
 
 //----------------------------------------------------------------------------------------
@@ -1726,6 +1744,7 @@ RBBICharMonkey::RBBICharMonkey() {
 
 void RBBICharMonkey::setText(const UnicodeString &s) {
     fText = &s;
+    prepareAppliedRules(s.length());
 }
 
 
@@ -1778,7 +1797,7 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
             break;
         }
 
-        appliedRule = "Rule  GB3   CR x LF";
+        appliedRule = "GB3   CR x LF";
         //     No Extend or Format characters may appear between the CR and LF,
         //     which requires the additional check for p2 immediately following p1.
         //
@@ -1787,7 +1806,7 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
             continue;
         }
 
-        appliedRule = "Rule (GB4).   ( Control | CR | LF ) <break>";
+        appliedRule = "GB4   ( Control | CR | LF ) <break>";
         if (fControlSet->contains(c1) ||
             c1 == 0x0D ||
             c1 == 0x0A)  {
@@ -1795,7 +1814,7 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
             break;
         }
 
-        appliedRule = "Rule (GB5)    <break>  ( Control | CR | LF )";
+        appliedRule = "GB5   <break>  ( Control | CR | LF )";
         if (fControlSet->contains(c2) ||
             c2 == 0x0D ||
             c2 == 0x0A)  {
@@ -1803,7 +1822,7 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
             break;
         }
 
-        appliedRule = "Rule (GB6)  L x ( L | V | LV | LVT )";
+        appliedRule = "GB6   L x ( L | V | LV | LVT )";
         if (fLSet->contains(c1) &&
                (fLSet->contains(c2)  ||
                 fVSet->contains(c2)  ||
@@ -1813,21 +1832,21 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
             continue;
         }
 
-        appliedRule = "Rule (GB7)    ( LV | V )  x  ( V | T )";
+        appliedRule = "GB7    ( LV | V )  x  ( V | T )";
         if ((fLVSet->contains(c1) || fVSet->contains(c1)) &&
             (fVSet->contains(c2) || fTSet->contains(c2)))  {
             setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        appliedRule = "Rule (GB8)    ( LVT | T)  x T";
+        appliedRule = "GB8   ( LVT | T)  x T";
         if ((fLVTSet->contains(c1) || fTSet->contains(c1)) &&
             fTSet->contains(c2))  {
             setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        appliedRule = "Rule (GB9)    x (Extend | ZWJ)";
+        appliedRule = "GB9   x (Extend | ZWJ)";
         if (fExtendSet->contains(c2) || fZWJSet->contains(c2))  {
             if (!fExtendSet->contains(c1)) {
                 cBase = c1;
@@ -1836,20 +1855,20 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
             continue;
         }
 
-        appliedRule = "Rule (GB9a)   x  SpacingMark";
+        appliedRule = "GB9a  x  SpacingMark";
         
         if (fSpacingSet->contains(c2)) {
             setAppliedRule(p2, appliedRule);
             continue;
         }
     
-        appliedRule = "Rule (GB9b)   Prepend x";
+        appliedRule = "GB9b  Prepend x";
         if (fPrependSet->contains(c1)) {
             setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        appliedRule = "Rule (GB9.3)  LinkingConsonant ExtCccZwj* Virama ExtCccZwj* × LinkingConsonant";
+        appliedRule = "GB9.3  LinkingConsonant ExtCccZwj* Virama ExtCccZwj* × LinkingConsonant";
         //   Note: Viramas are also included in the ExtCccZwj class.
         if (fLinkingConsonantSet->contains(c2)) {
             int pi = p1;
@@ -1866,13 +1885,13 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
             }
         }
 
-        appliedRule = "Rule (GB11)   Extended_Pictographic Extend * ZWJ x Extended_Pictographic";
+        appliedRule = "GB11  Extended_Pictographic Extend * ZWJ x Extended_Pictographic";
         if (fExtendedPictSet->contains(cBase) && fZWJSet->contains(c1) && fExtendedPictSet->contains(c2)) {
             setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        appliedRule = "Rule (GB12-13)    Regional_Indicator x Regional_Indicator";
+        appliedRule = "GB12-13  Regional_Indicator x Regional_Indicator";
         //                   Note: The first if condition is a little tricky. We only need to force
         //                      a break if there are three or more contiguous RIs. If there are
         //                      only two, a break following will occur via other rules, and will include
@@ -1887,7 +1906,7 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
             continue;
         }
 
-        appliedRule = "Rule (GB999)  Any  <break>  Any";
+        appliedRule = "GB999 Any <break> Any";
         setAppliedRule(p2, appliedRule);
         break;
     }
@@ -2034,10 +2053,10 @@ RBBIWordMonkey::RBBIWordMonkey()
     fSets->addElement(fLFSet, status); classNames.push_back("LF");
     fSets->addElement(fNewlineSet, status); classNames.push_back("Newline");
     fSets->addElement(fRegionalIndicatorSet, status); classNames.push_back("RegionalIndicator");
-    fSets->addElement(fHebrew_LetterSet, status); classNames.push_back("Heb");
+    fSets->addElement(fHebrew_LetterSet, status); classNames.push_back("Hebrew");
     fSets->addElement(fALetterSet, status); classNames.push_back("ALetter");
-    fSets->addElement(fSingle_QuoteSet, status); classNames.push_back("Sin");
-    fSets->addElement(fDouble_QuoteSet, status); classNames.push_back("Dou");
+    fSets->addElement(fSingle_QuoteSet, status); classNames.push_back("Single Quote");
+    fSets->addElement(fDouble_QuoteSet, status); classNames.push_back("Double Quote");
     // Omit Katakana from fSets, which omits Katakana characters
     // from the test data. They are all in the dictionary set,
     // which this (old, to be retired) monkey test cannot handle.
@@ -2063,6 +2082,7 @@ RBBIWordMonkey::RBBIWordMonkey()
 
 void RBBIWordMonkey::setText(const UnicodeString &s) {
     fText       = &s;
+    prepareAppliedRules(s.length());
 }
 
 
@@ -2119,7 +2139,7 @@ int32_t RBBIWordMonkey::next(int32_t prevPos) {
             break;
         }
 
-        appliedRule = "Rule  (3)   CR x LF";
+        appliedRule = "WB3   CR x LF";
         //     No Extend or Format characters may appear between the CR and LF,
         //     which requires the additional check for p2 immediately following p1.
         //
@@ -2128,7 +2148,7 @@ int32_t RBBIWordMonkey::next(int32_t prevPos) {
             continue;
         }
 
-        appliedRule = "Rule (3a)  Break before and after newlines (including CR and LF)";
+        appliedRule = "WB3a  Break before and after newlines (including CR and LF)";
         if (fCRSet->contains(c1) || fLFSet->contains(c1) || fNewlineSet->contains(c1))
         {
             setAppliedRule(p2, appliedRule);
@@ -2139,7 +2159,7 @@ int32_t RBBIWordMonkey::next(int32_t prevPos) {
             break;
         };
 
-        appliedRule = "Rule (3c)    ZWJ x Extended_Pictographic";
+        appliedRule = "WB3c  ZWJ x Extended_Pictographic";
         //              Not ignoring extend chars, so peek into input text to
         //              get the potential ZWJ, the character immediately preceding c2.
         //              Sloppy UChar32 indexing: p2-1 may reference trail half
@@ -2149,20 +2169,20 @@ int32_t RBBIWordMonkey::next(int32_t prevPos) {
             continue;
         }
 
-        appliedRule = "Rule (3d)    Keep horizontal whitespace together.";
+        appliedRule = "WB3d  Keep horizontal whitespace together.";
         if (fWSegSpaceSet->contains(fText->char32At(p2-1)) && fWSegSpaceSet->contains(c2)) {
             setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        appliedRule = "Rule (5).   (ALetter | Hebrew_Letter) x (ALetter | Hebrew_Letter)";
+        appliedRule = "WB4   (ALetter | Hebrew_Letter) x (ALetter | Hebrew_Letter)";
         if ((fALetterSet->contains(c1) || fHebrew_LetterSet->contains(c1)) &&
             (fALetterSet->contains(c2) || fHebrew_LetterSet->contains(c2)))  {
             setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        appliedRule = "Rule (6)  (ALetter | Hebrew_Letter)  x  (MidLetter | MidNumLet | Single_Quote) (ALetter | Hebrew_Letter)";
+        appliedRule = "WB6   (ALetter | Hebrew_Letter)  x  (MidLetter | MidNumLet | Single_Quote) (ALetter | Hebrew_Letter)";
         if ( (fALetterSet->contains(c1) || fHebrew_LetterSet->contains(c1))   &&
              (fMidLetterSet->contains(c2) || fMidNumLetSet->contains(c2) || fSingle_QuoteSet->contains(c2)) &&
              (fALetterSet->contains(c3) || fHebrew_LetterSet->contains(c3))) {
@@ -2170,7 +2190,7 @@ int32_t RBBIWordMonkey::next(int32_t prevPos) {
             continue;
         }
 
-        appliedRule = "Rule (7)  (ALetter | Hebrew_Letter) (MidLetter | MidNumLet | Single_Quote)  x  (ALetter | Hebrew_Letter)";
+        appliedRule = "WB7   (ALetter | Hebrew_Letter) (MidLetter | MidNumLet | Single_Quote)  x  (ALetter | Hebrew_Letter)";
         if ((fALetterSet->contains(c0) || fHebrew_LetterSet->contains(c0)) &&
             (fMidLetterSet->contains(c1) || fMidNumLetSet->contains(c1) || fSingle_QuoteSet->contains(c1)) &&
             (fALetterSet->contains(c2) || fHebrew_LetterSet->contains(c2))) {
@@ -2178,46 +2198,46 @@ int32_t RBBIWordMonkey::next(int32_t prevPos) {
             continue;
         }
 
-        appliedRule = "Rule (7a)     Hebrew_Letter x Single_Quote";
+        appliedRule = "WB7a  Hebrew_Letter x Single_Quote";
         if (fHebrew_LetterSet->contains(c1) && fSingle_QuoteSet->contains(c2)) {
             setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        appliedRule = "Rule (7b)    Hebrew_Letter x Double_Quote Hebrew_Letter";
+        appliedRule = "WB7b  Hebrew_Letter x Double_Quote Hebrew_Letter";
         if (fHebrew_LetterSet->contains(c1) && fDouble_QuoteSet->contains(c2) && fHebrew_LetterSet->contains(c3)) {
             setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        appliedRule = "Rule (7c)    Hebrew_Letter Double_Quote x Hebrew_Letter";
+        appliedRule = "WB7c  Hebrew_Letter Double_Quote x Hebrew_Letter";
         if (fHebrew_LetterSet->contains(c0) && fDouble_QuoteSet->contains(c1) && fHebrew_LetterSet->contains(c2)) {
             setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        appliedRule = "Rule (8)    Numeric x Numeric";
+        appliedRule = "WB8   Numeric x Numeric";
         if (fNumericSet->contains(c1) &&
             fNumericSet->contains(c2))  {
             setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        appliedRule = "Rule (9)    (ALetter | Hebrew_Letter) x Numeric";
+        appliedRule = "WB9   (ALetter | Hebrew_Letter) x Numeric";
         if ((fALetterSet->contains(c1) || fHebrew_LetterSet->contains(c1)) &&
             fNumericSet->contains(c2))  {
             setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        appliedRule = "Rule (10)    Numeric x (ALetter | Hebrew_Letter)";
+        appliedRule = "WB10   Numeric x (ALetter | Hebrew_Letter)";
         if (fNumericSet->contains(c1) &&
             (fALetterSet->contains(c2) || fHebrew_LetterSet->contains(c2)))  {
             setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        appliedRule = "Rule (11)   Numeric (MidNum | MidNumLet | Single_Quote)  x  Numeric";
+        appliedRule = "WB11  Numeric (MidNum | MidNumLet | Single_Quote)  x  Numeric";
         if (fNumericSet->contains(c0) &&
             (fMidNumSet->contains(c1) || fMidNumLetSet->contains(c1) || fSingle_QuoteSet->contains(c1))  &&
             fNumericSet->contains(c2)) {
@@ -2225,7 +2245,7 @@ int32_t RBBIWordMonkey::next(int32_t prevPos) {
             continue;
         }
 
-        appliedRule = "Rule (12)  Numeric x (MidNum | MidNumLet | SingleQuote) Numeric";
+        appliedRule = "WB12  Numeric x (MidNum | MidNumLet | SingleQuote) Numeric";
         if (fNumericSet->contains(c1) &&
             (fMidNumSet->contains(c2) || fMidNumLetSet->contains(c2) || fSingle_QuoteSet->contains(c2))  &&
             fNumericSet->contains(c3)) {
@@ -2233,7 +2253,7 @@ int32_t RBBIWordMonkey::next(int32_t prevPos) {
             continue;
         }
 
-        appliedRule = "Rule (13)  Katakana x Katakana";
+        appliedRule = "WB13  Katakana x Katakana";
         //            Note: matches UAX 29 rules, but doesn't come into play for ICU because
         //                  all Katakana are handled by the dictionary breaker.
         if (fKatakanaSet->contains(c1) &&
@@ -2242,7 +2262,7 @@ int32_t RBBIWordMonkey::next(int32_t prevPos) {
             continue;
         }
 
-        appliedRule = "Rule 13a    (ALetter | Hebrew_Letter | Numeric | KataKana | ExtendNumLet) x ExtendNumLet";
+        appliedRule = "WB13a (ALetter | Hebrew_Letter | Numeric | KataKana | ExtendNumLet) x ExtendNumLet";
         if ((fALetterSet->contains(c1) || fHebrew_LetterSet->contains(c1) ||fNumericSet->contains(c1) ||
              fKatakanaSet->contains(c1) || fExtendNumLetSet->contains(c1)) &&
              fExtendNumLetSet->contains(c2)) {
@@ -2250,7 +2270,7 @@ int32_t RBBIWordMonkey::next(int32_t prevPos) {
             continue;
         }
 
-        appliedRule = "Rule 13b   ExtendNumLet x (ALetter | Hebrew_Letter | Numeric | Katakana)";
+        appliedRule = "WB13b ExtendNumLet x (ALetter | Hebrew_Letter | Numeric | Katakana)";
         if (fExtendNumLetSet->contains(c1) &&
                 (fALetterSet->contains(c2) || fHebrew_LetterSet->contains(c2) ||
                  fNumericSet->contains(c2) || fKatakanaSet->contains(c2)))  {
@@ -2258,7 +2278,7 @@ int32_t RBBIWordMonkey::next(int32_t prevPos) {
             continue;
         }
 
-        appliedRule = "Rule 15 - 17   Group pairs of Regional Indicators.";
+        appliedRule = "WB15 - WB17   Group pairs of Regional Indicators.";
         if (fRegionalIndicatorSet->contains(c0) && fRegionalIndicatorSet->contains(c1)) {
             setAppliedRule(p2, appliedRule);
             break;
@@ -2268,7 +2288,7 @@ int32_t RBBIWordMonkey::next(int32_t prevPos) {
             continue;
         }
 
-        appliedRule = "Rule 999.  Break found here.";
+        appliedRule = "WB999";
         setAppliedRule(p2, appliedRule);
         break;
     }
@@ -2412,6 +2432,7 @@ RBBISentMonkey::RBBISentMonkey()
 
 void RBBISentMonkey::setText(const UnicodeString &s) {
     fText       = &s;
+    prepareAppliedRules(s.length());
 }
 
 UVector  *RBBISentMonkey::charClasses() {
@@ -2495,13 +2516,13 @@ int32_t RBBISentMonkey::next(int32_t prevPos) {
         p3 = moveForward(p3);
         c3 = cAt(p3);
 
-        appliedRule = "Rule (3)  CR x LF";
+        appliedRule = "SB3   CR x LF";
         if (c1==0x0d && c2==0x0a && p2==(p1+1)) {
             setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        appliedRule = "Rule (4).   Sep  <break>";
+        appliedRule = "SB4   Sep  <break>";
         if (fSepSet->contains(c1)) {
             p2 = p1+1;   // Separators don't combine with Extend or Format.
             
@@ -2521,20 +2542,20 @@ int32_t RBBISentMonkey::next(int32_t prevPos) {
             continue;
         }
 
-        appliedRule = "Rule (6).   ATerm x Numeric";
+        appliedRule = "SB6   ATerm x Numeric";
         if (fATermSet->contains(c1) &&  fNumericSet->contains(c2))  {
             setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        appliedRule = "Rule (7).  (Upper | Lower) ATerm  x  Uppper";
+        appliedRule = "SB7   (Upper | Lower) ATerm  x  Uppper";
         if ((fUpperSet->contains(c0) || fLowerSet->contains(c0)) &&
                 fATermSet->contains(c1) && fUpperSet->contains(c2)) {
             setAppliedRule(p2, appliedRule);
             continue;
         }
 
-        appliedRule = "Rule (8)  ATerm Close* Sp*  x  (not (OLettter | Upper | Lower | Sep | STerm | ATerm))* Lower";
+        appliedRule = "SB8   ATerm Close* Sp*  x  (not (OLettter | Upper | Lower | Sep | STerm | ATerm))* Lower";
         //           Note:  STerm | ATerm are added to the negated part of the expression by a
         //                  note to the Unicode 5.0 documents.
         int p8 = p1;
@@ -2564,7 +2585,7 @@ int32_t RBBISentMonkey::next(int32_t prevPos) {
             }
         }
 
-        appliedRule = "Rule 8a   (STerm | ATerm) Close* Sp* x (SContinue | STerm | ATerm)";
+        appliedRule = "SB8a  (STerm | ATerm) Close* Sp* x (SContinue | STerm | ATerm)";
         if (fSContinueSet->contains(c2) || fSTermSet->contains(c2) || fATermSet->contains(c2)) {
             p8 = p1;
             while (fSpSet->contains(cAt(p8))) {
@@ -2581,7 +2602,7 @@ int32_t RBBISentMonkey::next(int32_t prevPos) {
             }
         }
 
-        appliedRule = "Rule (9)  (STerm | ATerm) Close*  x  (Close | Sp | Sep | CR | LF)";
+        appliedRule = "SB9  (STerm | ATerm) Close*  x  (Close | Sp | Sep | CR | LF)";
         int p9 = p1;
         while (fCloseSet->contains(cAt(p9))) {
             p9 = moveBack(p9);
@@ -2595,7 +2616,7 @@ int32_t RBBISentMonkey::next(int32_t prevPos) {
             }
         }
 
-        appliedRule = "Rule (10)  (Sterm | ATerm) Close* Sp*  x  (Sp | Sep | CR | LF)";
+        appliedRule = "SB10  (Sterm | ATerm) Close* Sp*  x  (Sp | Sep | CR | LF)";
         int p10 = p1;
         while (fSpSet->contains(cAt(p10))) {
             p10 = moveBack(p10);
@@ -2610,7 +2631,7 @@ int32_t RBBISentMonkey::next(int32_t prevPos) {
             }
         }
 
-        appliedRule = "Rule (11)  (STerm | ATerm) Close* Sp* (Sep | CR | LF)?  <break>";
+        appliedRule = "SB11  (STerm | ATerm) Close* Sp* (Sep | CR | LF)?  <break>";
         int p11 = p1;
         if (fSepSet->contains(cAt(p11))) {
             p11 = moveBack(p11);
@@ -2626,7 +2647,7 @@ int32_t RBBISentMonkey::next(int32_t prevPos) {
             break;
         }
 
-        appliedRule = "Rule (12)  Any x Any";
+        appliedRule = "SB12  Any x Any";
         setAppliedRule(p2, appliedRule);
         continue;
     }
@@ -2862,6 +2883,7 @@ RBBILineMonkey::RBBILineMonkey() :
 void RBBILineMonkey::setText(const UnicodeString &s) {
     fText       = &s;
     fCharBI->setText(s);
+    prepareAppliedRules(s.length());
     fNumberMatcher->reset(s);
 }
 
@@ -2971,14 +2993,14 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         nextPos   = nextCPPos;
 
 
-        appliedRule = "Rule LB2 - Break at end of text.";
+        appliedRule = "LB2 - Break at end of text.";
         if (pos >= fText->length()) {
             setAppliedRule(pos, appliedRule);
             break;
         }
 
 
-        appliedRule = "Rule LB 9 - adjust for combining sequences.";
+        appliedRule = "LB 9 - adjust for combining sequences.";
         //             We do this one out-of-order because the adjustment does not change anything
         //             that would match rules LB 3 - LB 6, but after the adjustment, LB 3-6 do need to
         //             be applied.
@@ -2996,14 +3018,14 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         }
 
 
-        appliedRule = "Rule LB 4  Always break after hard line breaks";
+        appliedRule = "LB 4  Always break after hard line breaks";
         if (fBK->contains(prevChar)) {
             setAppliedRule(pos, appliedRule);
             break;
         }
 
 
-        appliedRule = "Rule LB 5  Break after CR, LF, NL, but not inside CR LF";
+        appliedRule = "LB 5  Break after CR, LF, NL, but not inside CR LF";
         if (prevChar == 0x0d && thisChar == 0x0a) {
             setAppliedRule(pos, appliedRule);
             continue;
@@ -3016,7 +3038,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         }
 
 
-        appliedRule = "Rule LB 6  Don't break before hard line breaks";
+        appliedRule = "LB 6  Don't break before hard line breaks";
         if (thisChar == 0x0d || thisChar == 0x0a || thisChar == 0x85 ||
             fBK->contains(thisChar)) {
             setAppliedRule(pos, appliedRule);
@@ -3024,7 +3046,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         }
 
 
-        appliedRule = "Rule LB 7  Don't break before spaces or zero-width space.";
+        appliedRule = "LB 7  Don't break before spaces or zero-width space.";
         if (fSP->contains(thisChar)) {
             setAppliedRule(pos, appliedRule);
             continue;
@@ -3036,7 +3058,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         }
 
 
-        appliedRule = "Rule LB 8  Break after zero width space";
+        appliedRule = "LB 8  Break after zero width space";
         //       ZW SP* ÷
         //       Scan backwards from prevChar for SP* ZW
         tPos = prevPos;
@@ -3049,7 +3071,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         }
 
 
-        appliedRule = "Rule LB 25    Numbers";
+        appliedRule = "LB 25    Numbers";
         //          Move this test up, before LB8a, because numbers can match a longer sequence that would
         //          also match 8a.  e.g. NU ZWJ IS PO     (ZWJ acts like CM)
         if (fNumberMatcher->lookingAt(prevPos, status)) {
@@ -3078,7 +3100,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         }
 
 
-        appliedRule = "Rule LB 8a ZWJ x";
+        appliedRule = "LB 8a ZWJ x";
         //       The monkey test's way of ignoring combining characters doesn't work
         //       for this rule. ZJ is also a CM. Need to get the actual character
         //       preceding "thisChar", not ignoring combining marks, possibly ZJ.
@@ -3092,11 +3114,11 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         }
 
 
-        // appliedRule = "Rule LB 9, 10"; //  Already done, at top of loop.";
+        // appliedRule = "LB 9, 10"; //  Already done, at top of loop.";
         //
 
 
-        appliedRule = "Rule LB 11  Do not break before or after WORD JOINER and related characters.";
+        appliedRule = "LB 11  Do not break before or after WORD JOINER and related characters.";
         //    x  WJ
         //    WJ  x
         //
@@ -3106,14 +3128,14 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         }
 
 
-        appliedRule = "Rule LB 12  GL  x";
+        appliedRule = "LB 12  GL  x";
         if (fGL->contains(prevChar)) {
             setAppliedRule(pos, appliedRule);
             continue;
         }
 
 
-        appliedRule = "Rule LB 12a  [^SP BA HY] x GL";
+        appliedRule = "LB 12a  [^SP BA HY] x GL";
         if (!(fSP->contains(prevChar) ||
               fBA->contains(prevChar) ||
               fHY->contains(prevChar)     ) && fGL->contains(thisChar)) {
@@ -3122,7 +3144,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         }
 
 
-        appliedRule = "Rule LB 13  Don't break before closings.";
+        appliedRule = "LB 13  Don't break before closings.";
         if (fCL->contains(thisChar) ||
                 fCP->contains(thisChar) ||
                 fEX->contains(thisChar) ||
@@ -3132,7 +3154,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         }
 
 
-        appliedRule = "Rule LB 14 Don't break after OP SP*";
+        appliedRule = "LB 14 Don't break after OP SP*";
         //       Scan backwards, checking for this sequence.
         //       The OP char could include combining marks, so we actually check for
         //           OP CM* SP*
@@ -3155,7 +3177,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         }
 
 
-        appliedRule = "Rule LB 14a Break before an IS that begins a number and follows a space";
+        appliedRule = "LB 14a Break before an IS that begins a number and follows a space";
         if (nextPos < fText->length()) {
             // note: UnicodeString::char32At(length) returns ffff, not distinguishable
             //       from a legit ffff character. So test length separately.
@@ -3167,14 +3189,14 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         }
 
 
-        appliedRule = "Rule LB14b Do not break before numeric separators, even after spaces.";
+        appliedRule = "LB14b Do not break before numeric separators, even after spaces.";
         if (fIS->contains(thisChar)) {
             setAppliedRule(pos, appliedRule);
             continue;
         }
 
 
-        appliedRule = "Rule LB 15    QU SP* x OP";
+        appliedRule = "LB 15    QU SP* x OP";
         if (fOP->contains(thisChar)) {
             // Scan backwards from prevChar to see if it is preceded by QU CM* SP*
             int tPos = prevPos;
@@ -3191,7 +3213,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         }
 
 
-        appliedRule = "Rule LB 16   (CL | CP) SP* x NS";
+        appliedRule = "LB 16   (CL | CP) SP* x NS";
         //    Scan backwards for SP* CM* (CL | CP)
         if (fNS->contains(thisChar)) {
             int tPos = prevPos;
@@ -3208,7 +3230,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         }
 
 
-        appliedRule = "Rule LB 17   B2 SP* x B2";
+        appliedRule = "LB 17   B2 SP* x B2";
         if (fB2->contains(thisChar)) {
             //  Scan backwards, checking for the B2 CM* SP* sequence.
             tPos = prevPos;
@@ -3227,13 +3249,13 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         }
 
 
-        appliedRule = "Rule LB 18    break after space";
+        appliedRule = "LB 18    break after space";
         if (fSP->contains(prevChar)) {
             setAppliedRule(pos, appliedRule);
             break;
         }
 
-        appliedRule = "Rule LB 19";
+        appliedRule = "LB 19";
         //    x   QU
         //    QU  x
         if (fQU->contains(thisChar) || fQU->contains(prevChar)) {
@@ -3241,13 +3263,13 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
             continue;
         }
 
-        appliedRule = "Rule LB 20  Break around a CB";
+        appliedRule = "LB 20  Break around a CB";
         if (fCB->contains(thisChar) || fCB->contains(prevChar)) {
             setAppliedRule(pos, appliedRule);
             break;
         }
 
-        appliedRule = "Rule LB 20.09";
+        appliedRule = "LB 20.09";
         //           Don't break between Hyphens and letters if a break precedes the hyphen.
         //           Formerly this was a Finnish tailoring.
         //           Moved to root in ICU 63. This is an ICU customization, not in UAX-14.
@@ -3258,7 +3280,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
             continue;
         }
 
-        appliedRule = "Rule LB 21";
+        appliedRule = "LB 21";
         if (fBA->contains(thisChar) ||
             fHY->contains(thisChar) ||
             fNS->contains(thisChar) ||
@@ -3267,20 +3289,20 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
             continue;
         }
 
-        appliedRule = "Rule LB 21a   HL (HY | BA) x";
+        appliedRule = "LB 21a   HL (HY | BA) x";
         if (fHL->contains(prevCharX2) &&
                 (fHY->contains(prevChar) || fBA->contains(prevChar))) {
             setAppliedRule(pos, appliedRule);
             continue;
         }
 
-        appliedRule = "Rule LB 21b SY x HL";
+        appliedRule = "LB 21b SY x HL";
         if (fSY->contains(prevChar) && fHL->contains(thisChar)) {
             setAppliedRule(pos, appliedRule);
             continue;
         }
 
-        appliedRule = "Rule LB 22";
+        appliedRule = "LB 22";
         if ((fAL->contains(prevChar) && fIN->contains(thisChar)) ||
             (fEX->contains(prevChar) && fIN->contains(thisChar)) ||
             (fHL->contains(prevChar) && fIN->contains(thisChar)) ||
@@ -3292,7 +3314,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
         }
 
 
-        appliedRule = "Rule LB 23";
+        appliedRule = "LB 23";
         //          (AL | HL) x NU
         //          NU x (AL | HL)
         if ((fAL->contains(prevChar) || fHL->contains(prevChar)) && fNU->contains(thisChar)) {
@@ -3304,7 +3326,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
             continue;
         }
 
-        appliedRule = "Rule LB 23a";
+        appliedRule = "LB 23a";
         // Do not break between numeric prefixes and ideographs, or between ideographs and numeric postfixes.
         //      PR x (ID | EB | EM)
         //     (ID | EB | EM) x PO
@@ -3319,7 +3341,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
             continue;
         }
 
-        appliedRule = "Rule LB 24";  
+        appliedRule = "LB 24";  
         //   Do not break between prefix and letters or ideographs.
         //         (PR | PO) x (AL | HL)
         //         (AL | HL) x (PR | PO)
@@ -3334,9 +3356,9 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
             continue;
         }
 
-        // appliedRule = "Rule LB 25 numbers match"; // moved up, before LB 8a,
+        // appliedRule = "LB 25 numbers match"; // moved up, before LB 8a,
 
-        appliedRule = "Rule LB 26 Do not break a Korean syllable.";
+        appliedRule = "LB 26 Do not break a Korean syllable.";
         if (fJL->contains(prevChar) && (fJL->contains(thisChar) ||
                                         fJV->contains(thisChar) ||
                                         fH2->contains(thisChar) ||
@@ -3357,7 +3379,7 @@ int32_t RBBILineMonkey::next(int32_t startPos) {
             continue;
         }
 
-        appliedRule = "Rule LB 27 Treat a Korean Syllable Block the same as ID.";
+        appliedRule = "LB 27 Treat a Korean Syllable Block the same as ID.";
         if ((fJL->contains(prevChar) || fJV->contains(prevChar) ||
             fJT->contains(prevChar) || fH2->contains(prevChar) || fH3->contains(prevChar)) &&
             fIN->contains(thisChar)) {
@@ -3675,7 +3697,6 @@ void RBBITest::TestWordBreaks(void)
         int expectedcount = 0;
 
         monkey.setText(ustr);
-        monkey.prepareAppliedRules(50 * 2 + 1);
         int i;
         for (i = 0; i != BreakIterator::DONE; i = monkey.next(i)) {
             expected[expectedcount ++] = i;
@@ -3849,7 +3870,6 @@ void RBBITest::TestLineBreaks(void)
         int expectedcount = 0;
 
         monkey.setText(ustr);
-        monkey.prepareAppliedRules(50 * 2 + 1);
 
         int i;
         for (i = 0; i != BreakIterator::DONE; i = monkey.next(i)) {
@@ -3915,7 +3935,6 @@ void RBBITest::TestSentBreaks(void)
         int expectedcount = 0;
 
         monkey.setText(ustr);
-        monkey.prepareAppliedRules(50 * 2 + 1);
 
         int i;
         for (i = 0; i != BreakIterator::DONE; i = monkey.next(i)) {
@@ -4032,7 +4051,7 @@ void RBBITest::TestMonkey() {
             loopCount = loopCount / 10;   // Sentence runs slower than the other break types
         }
         if (U_SUCCESS(status)) {
-            RunMonkey(bi, m, "sentence", seed, loopCount, useUText);
+            RunMonkey(bi, m, "sent", seed, loopCount, useUText);
         }
         else {
             errcheckln(status, "Creation of line break iterator failed %s", u_errorName(status));
@@ -4094,6 +4113,16 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
         }
     }
     
+    // Get formatting string for error lines
+    char maxClassBuffSize[10];
+    snprintf(maxClassBuffSize, 10, "%d", mk.maxClassNameSize());
+    std::string errLineFormatString =
+        "%4s %3i :  %1s  %1s  %10s  %-" + 
+        std::string(maxClassBuffSize) +
+        "s  %-40s  %-40s";
+    char* errLineFormat = new char[errLineFormatString.size() + 1];
+    strcpy(errLineFormat, errLineFormatString.c_str());
+
     while (loopCount < numIterations || numIterations == -1) {
         if (numIterations == -1 && loopCount % 10 == 0) {
             // If test is running in an infinite loop, display a periodic tic so
@@ -4124,11 +4153,8 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
             testText.append(c);
         }
 
-        // Calculate the expected results for this test string.
+        // Calculate the expected results for this test string and reset applied rules.
         mk.setText(testText);
-        
-        // Resize the applied rules vector.
-        mk.prepareAppliedRules(testText.length());
 
         memset(expectedBreaks, 0, sizeof(expectedBreaks));
         expectedBreaks[0] = 1;
@@ -4260,7 +4286,6 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
 
                 // Start of the range is the last point where expected and actual results
                 //  both agreed that there was a break position.
-                std::vector<std::string>& charClassNames = mk.characterClassNames();
 
                 int startContext = i;
                 int32_t count = 0;
@@ -4295,63 +4320,48 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                 //   Unicode name of character
                 //   '-->' indicates location of the difference.
 
-                UErrorCode status = U_ZERO_ERROR;
-                const char *badLocale = bi->getLocaleID(ULOC_ACTUAL_LOCALE, status);
-                errln("\n%s break monkey test error [%s].  %s. Operation = %s; Random seed = %d;  buf Idx = %d",
-                    name, badLocale, (expectedBreaks[i]? "break expected but not found" : "break found but not expected"),
-                    errorType, seed, i);
+                MONKEY_ERROR(
+                    (expectedBreaks[i] ? "Break expected but not found" :
+                       "Break found but not expected"),
+                    name, i, seed);
 
-                for (ci=startContext; ci<=endContext;) {
-                    UnicodeString errorText = "";
+                for (ci=startContext; (ci = testText.moveIndex32(ci, 1));) {
                     UChar32  c;
                     c = testText.char32At(ci);
                     
-                    char buffer[200];
-                    std::string format = "    %3i : ";
+                    std::string currentLineFlag = "   ";
                     if (ci == i) {
-                        format =  "--> %3i : ";  // Error position
+                        currentLineFlag = "-->";  // Error position
                     }
-                    sprintf(buffer, format.c_str(), ci);
-                    errorText.append(buffer);
 
                     // BMP or SMP character in hex
-                    format = "    \\u%04x";
+                    char hexCodePoint[12];
+                    std::string format = "    \\u%04x";
                     if (c >= 0x10000) {
                         format = "\\U%08x";
                     }
-                    sprintf(buffer, format.c_str(), c);
-                    errorText.append(buffer);
+                    sprintf(hexCodePoint, format.c_str(), c);
 
-                    // Indicate reference and actual break status
-                    errorText.append(expectedBreaks[ci] == 0 ? "  . " : "  | ");
-                    errorText.append(currentBreakData[ci] == 0 ? " . " : " | ");
-                    
                     // Get the class name and character name for the character.
-                    const unsigned long classIndex = mk.classIndexFromTestTextClassIndex(c);
                     char cName[200];
                     UErrorCode status = U_ZERO_ERROR;
                     u_charName(c, U_EXTENDED_CHAR_NAME, cName, sizeof(cName), &status);
 
-                    // The applied rule string
-                    const std::string appliedRule = mk.getAppliedRule(ci);
-
-                    sprintf(buffer, "%15s  %20s -->>>  %20s", 
-                        charClassNames[classIndex].c_str(), cName, appliedRule.c_str());
-                    errorText.append(buffer);
-
-                    // Move to next character position
-                    int ci_old = ci;
-                    ci = testText.moveIndex32(ci, 1);
-                    if (ci == ci_old) {
-                        // Force the loop to skip. This may occur with \ufff at end.
-                        ci = endContext + 1;
-                    }
+                    char buffer[200];
+                    snprintf(buffer, 200,
+                        errLineFormat,
+                        currentLineFlag.c_str(),
+                        ci, 
+                        expectedBreaks[ci] == 0 ? "." : "|",  // Reference break
+                        currentBreakData[ci] == 0 ? "." : "|",  // Actual break
+                        hexCodePoint,
+                        mk.classNameFromCodepoint(c).c_str(),
+                        mk.getAppliedRule(ci).c_str(), cName);
 
                     // Output the error
-                    char  charErrorTxt[500];
-                    errorText.extract(charErrorTxt, sizeof(charErrorTxt), NULL, status);
-                    charErrorTxt[sizeof(charErrorTxt)-1] = 0;
-                    errln("%s", charErrorTxt);
+                    errln(buffer);
+                    
+                    if (ci >= endContext) { break; }
                 }
                 break;
             }
