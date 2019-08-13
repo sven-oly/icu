@@ -4359,7 +4359,11 @@ void RBBITest::RunMonkey(BreakIterator *bi, RBBIMonkeyKind &mk, const char *name
                         mk.getAppliedRule(ci).c_str(), cName);
 
                     // Output the error
-                    errln(buffer);
+                    if (ci == i) {
+                        errln(buffer);
+                    } else {
+                        infoln(buffer);
+                    }
                     
                     if (ci >= endContext) { break; }
                 }
