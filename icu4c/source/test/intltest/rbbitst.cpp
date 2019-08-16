@@ -1856,7 +1856,6 @@ int32_t RBBICharMonkey::next(int32_t prevPos) {
         }
 
         appliedRule = "GB9a  x  SpacingMark";
-        
         if (fSpacingSet->contains(c2)) {
             setAppliedRule(p2, appliedRule);
             continue;
