@@ -178,15 +178,8 @@ Locale *locale_set_default_internal(const char *id, UErrorCode& status) {
         canonicalize = true; // always canonicalize host ID
     }
 
-    CharString localeNameBuf;
-    {
-        CharStringByteSink sink(&localeNameBuf);
-        if (canonicalize) {
-            ulocimp_canonicalize(id, sink, status);
-        } else {
-            ulocimp_getName(id, sink, status);
-        }
-    }
+    CharString localeNameBuf =
+        canonicalize ? ulocimp_canonicalize(id, status) : ulocimp_getName(id, status);
 
     if (U_FAILURE(status)) {
         return gDefaultLocale;
@@ -916,6 +909,8 @@ AliasData::loadData(UErrorCode &status)
  */
 AliasData*
 AliasDataBuilder::build(UErrorCode &status) {
+    if (U_FAILURE(status)) { return nullptr; }
+
     LocalUResourceBundlePointer metadata(
         ures_openDirect(nullptr, "metadata", &status));
     LocalUResourceBundlePointer metadataAlias(
@@ -1061,7 +1056,7 @@ AliasDataBuilder::build(UErrorCode &status) {
  */
 class AliasReplacer {
 public:
-    AliasReplacer(UErrorCode status) :
+    AliasReplacer(UErrorCode& status) :
             language(nullptr), script(nullptr), region(nullptr),
             extensions(nullptr),
             // store value in variants only once
@@ -1126,12 +1121,12 @@ private:
     }
 
     // Gather fields and generate locale ID into out.
-    CharString& outputToString(CharString& out, UErrorCode status);
+    CharString& outputToString(CharString& out, UErrorCode& status);
 
     // Generate the lookup key.
     CharString& generateKey(const char* language, const char* region,
                             const char* variant, CharString& out,
-                            UErrorCode status);
+                            UErrorCode& status);
 
     void parseLanguageReplacement(const char* replacement,
                                   const char*& replaceLanguage,
@@ -1168,8 +1163,9 @@ private:
 CharString&
 AliasReplacer::generateKey(
         const char* language, const char* region, const char* variant,
-        CharString& out, UErrorCode status)
+        CharString& out, UErrorCode& status)
 {
+    if (U_FAILURE(status)) { return out; }
     out.append(language, status);
     if (notEmpty(region)) {
         out.append(SEP_CHAR, status)
@@ -1525,13 +1521,12 @@ AliasReplacer::replaceTransformedExtensions(
     const char* tkey = ultag_getTKeyStart(str);
     int32_t tlangLen = (tkey == str) ? 0 :
         ((tkey == nullptr) ? len : static_cast<int32_t>((tkey - str - 1)));
-    CharStringByteSink sink(&output);
     if (tlangLen > 0) {
         Locale tlang = LocaleBuilder()
             .setLanguageTag(StringPiece(str, tlangLen))
             .build(status);
         tlang.canonicalize(status);
-        tlang.toLanguageTag(sink, status);
+        output = tlang.toLanguageTag<CharString>(status);
         if (U_FAILURE(status)) {
             return false;
         }
@@ -1587,8 +1582,9 @@ AliasReplacer::replaceTransformedExtensions(
 
 CharString&
 AliasReplacer::outputToString(
-    CharString& out, UErrorCode status)
+    CharString& out, UErrorCode& status)
 {
+    if (U_FAILURE(status)) { return out; }
     out.append(language, status);
     if (notEmpty(script)) {
         out.append(SEP_CHAR, status)
@@ -1731,9 +1727,7 @@ AliasReplacer::replace(const Locale& locale, CharString& out, UErrorCode& status
             while ((key = iter->next(nullptr, status)) != nullptr) {
                 if (uprv_strcmp("sd", key) == 0 || uprv_strcmp("rg", key) == 0 ||
                         uprv_strcmp("t", key) == 0) {
-                    CharString value;
-                    CharStringByteSink valueSink(&value);
-                    locale.getKeywordValue(key, valueSink, status);
+                    auto value = locale.getKeywordValue<CharString>(key, status);
                     if (U_FAILURE(status)) {
                         status = U_ZERO_ERROR;
                         continue;
@@ -1778,6 +1772,7 @@ AliasReplacer::replace(const Locale& locale, CharString& out, UErrorCode& status
 bool
 canonicalizeLocale(const Locale& locale, CharString& out, UErrorCode& status)
 {
+    if (U_FAILURE(status)) { return false; }
     AliasReplacer replacer(status);
     return replacer.replace(locale, out, status);
 }
@@ -1787,6 +1782,8 @@ canonicalizeLocale(const Locale& locale, CharString& out, UErrorCode& status)
 bool
 isKnownCanonicalizedLocale(const char* locale, UErrorCode& status)
 {
+    if (U_FAILURE(status)) { return false; }
+
     if (    uprv_strcmp(locale, "c") == 0 ||
             uprv_strcmp(locale, "en") == 0 ||
             uprv_strcmp(locale, "en_US") == 0) {
@@ -2076,11 +2073,7 @@ Locale::addLikelySubtags(UErrorCode& status) {
         return;
     }
 
-    CharString maximizedLocaleID;
-    {
-        CharStringByteSink sink(&maximizedLocaleID);
-        ulocimp_addLikelySubtags(fullName, sink, status);
-    }
+    CharString maximizedLocaleID = ulocimp_addLikelySubtags(fullName, status);
 
     if (U_FAILURE(status)) {
         return;
@@ -2102,11 +2095,7 @@ Locale::minimizeSubtags(bool favorScript, UErrorCode& status) {
         return;
     }
 
-    CharString minimizedLocaleID;
-    {
-        CharStringByteSink sink(&minimizedLocaleID);
-        ulocimp_minimizeSubtags(fullName, sink, favorScript, status);
-    }
+    CharString minimizedLocaleID = ulocimp_minimizeSubtags(fullName, favorScript, status);
 
     if (U_FAILURE(status)) {
         return;
@@ -2157,17 +2146,12 @@ Locale::forLanguageTag(StringPiece tag, UErrorCode& status)
     // parsing. Therefore the code here explicitly calls uloc_forLanguageTag()
     // and then Locale::init(), instead of just calling the normal constructor.
 
-    CharString localeID;
     int32_t parsedLength;
-    {
-        CharStringByteSink sink(&localeID);
-        ulocimp_forLanguageTag(
-                tag.data(),
-                tag.length(),
-                sink,
-                &parsedLength,
-                status);
-    }
+    CharString localeID = ulocimp_forLanguageTag(
+            tag.data(),
+            tag.length(),
+            &parsedLength,
+            status);
 
     if (U_FAILURE(status)) {
         return result;
@@ -2453,7 +2437,8 @@ public:
                 (int32_t)(current - keywords.data()), status);
     }
 
-    virtual int32_t count(UErrorCode &/*status*/) const override {
+    virtual int32_t count(UErrorCode& status) const override {
+        if (U_FAILURE(status)) { return 0; }
         const char *kw = keywords.data();
         int32_t result = 0;
         while(*kw) {
@@ -2483,12 +2468,14 @@ public:
     }
 
     virtual const UnicodeString* snext(UErrorCode& status) override {
+        if (U_FAILURE(status)) { return nullptr; }
         int32_t resultLength = 0;
         const char *s = next(&resultLength, status);
         return setChars(s, resultLength, status);
     }
 
-    virtual void reset(UErrorCode& /*status*/) override {
+    virtual void reset(UErrorCode& status) override {
+        if (U_FAILURE(status)) { return; }
         current = keywords.data();
     }
 };
@@ -2521,7 +2508,8 @@ public:
         if (resultLength != nullptr) *resultLength = 0;
         return nullptr;
     }
-    virtual int32_t count(UErrorCode &/*status*/) const override {
+    virtual int32_t count(UErrorCode& status) const override {
+        if (U_FAILURE(status)) { return 0; }
         const char *kw = keywords.data();
         int32_t result = 0;
         while(*kw) {
@@ -2550,9 +2538,7 @@ Locale::createKeywords(UErrorCode &status) const
     const char* assignment = uprv_strchr(fullName, '=');
     if(variantStart) {
         if(assignment > variantStart) {
-            CharString keywords;
-            CharStringByteSink sink(&keywords);
-            ulocimp_getKeywords(variantStart+1, '@', sink, false, status);
+            CharString keywords = ulocimp_getKeywords(variantStart + 1, '@', false, status);
             if (U_SUCCESS(status) && !keywords.isEmpty()) {
                 result = new KeywordEnumeration(keywords.data(), keywords.length(), 0, status);
                 if (!result) {
@@ -2579,9 +2565,7 @@ Locale::createUnicodeKeywords(UErrorCode &status) const
     const char* assignment = uprv_strchr(fullName, '=');
     if(variantStart) {
         if(assignment > variantStart) {
-            CharString keywords;
-            CharStringByteSink sink(&keywords);
-            ulocimp_getKeywords(variantStart+1, '@', sink, false, status);
+            CharString keywords = ulocimp_getKeywords(variantStart + 1, '@', false, status);
             if (U_SUCCESS(status) && !keywords.isEmpty()) {
                 result = new UnicodeKeywordEnumeration(keywords.data(), keywords.length(), 0, status);
                 if (!result) {
@@ -2625,6 +2609,10 @@ void
 Locale::getUnicodeKeywordValue(StringPiece keywordName,
                                ByteSink& sink,
                                UErrorCode& status) const {
+    if (U_FAILURE(status)) {
+        return;
+    }
+
     // TODO: Remove the need for a const char* to a NUL terminated buffer.
     const CharString keywordName_nul(keywordName, status);
     if (U_FAILURE(status)) {
@@ -2632,17 +2620,12 @@ Locale::getUnicodeKeywordValue(StringPiece keywordName,
     }
 
     const char* legacy_key = uloc_toLegacyKey(keywordName_nul.data());
-
     if (legacy_key == nullptr) {
         status = U_ILLEGAL_ARGUMENT_ERROR;
         return;
     }
 
-    CharString legacy_value;
-    {
-        CharStringByteSink sink(&legacy_value);
-        getKeywordValue(legacy_key, sink, status);
-    }
+    auto legacy_value = getKeywordValue<CharString>(legacy_key, status);
 
     if (U_FAILURE(status)) {
         return;
@@ -2705,6 +2688,7 @@ void
 Locale::setKeywordValue(StringPiece keywordName,
                         StringPiece keywordValue,
                         UErrorCode& status) {
+    if (U_FAILURE(status)) { return; }
     // TODO: Remove the need for a const char* to a NUL terminated buffer.
     const CharString keywordName_nul(keywordName, status);
     const CharString keywordValue_nul(keywordValue, status);
@@ -2715,16 +2699,18 @@ void
 Locale::setUnicodeKeywordValue(StringPiece keywordName,
                                StringPiece keywordValue,
                                UErrorCode& status) {
+    if (U_FAILURE(status)) {
+        return;
+    }
+
     // TODO: Remove the need for a const char* to a NUL terminated buffer.
     const CharString keywordName_nul(keywordName, status);
     const CharString keywordValue_nul(keywordValue, status);
-
     if (U_FAILURE(status)) {
         return;
     }
 
     const char* legacy_key = uloc_toLegacyKey(keywordName_nul.data());
-
     if (legacy_key == nullptr) {
         status = U_ILLEGAL_ARGUMENT_ERROR;
         return;
